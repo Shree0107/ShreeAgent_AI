@@ -65,6 +65,31 @@ class Settings(BaseSettings):
     scan_include_forecast: bool = False
     alert_score_threshold: float = 40.0
 
+    # ---- Beginner signals (Signals tab) ----
+    signal_timeframe: str = "1d"            # chart the entry/stop/targets are built on
+    signal_forecast_horizon: int = 10       # TimesFM candles used in the decision
+    signal_include_forecast: bool = True
+    signal_min_rr: float = 1.5              # BUY/SELL only if reward/risk to target 1 >= this
+    signal_min_score: float = 25.0          # |combined score| needed for a direction (0-100)
+    signal_high_score: float = 50.0         # |score| needed for High confidence
+    signal_min_confidence: str = "Medium"   # Low | Medium | High: anything below -> WAIT
+    signal_event_blackout_days: int = 1     # WAIT if a high-impact event is today or within N days
+    signal_event_warning_days: int = 7      # show a warning for events within N days
+    signal_earnings_blackout_days: int = 3  # stocks: WAIT if earnings are within N days
+    signal_max_stop_atr: float = 3.0        # WAIT if the structural stop is wider than N x daily range
+    signal_expiry_bars: int = 3             # trading days a signal stays valid
+    signal_refresh_minutes: int = 60        # reuse stored signals younger than this
+    signal_llm_polish: bool = False         # let the LLM reword the explanations (numbers locked)
+
+    # ---- Position size helper (defaults; editable in the app) ----
+    account_size: float = 1000.0
+    account_currency: str = "EUR"
+    risk_per_trade_pct: float = 1.0
+    leverage: float = 30.0                  # EU retail max for major FX pairs (XTB, ESMA rules)
+    spread_pips: float = 1.0                # added to the stop so the broker spread can't trigger it
+    fx_lot_size: int = 100_000              # units of the base currency in 1 standard lot
+    fx_min_lot: float = 0.01
+
     log_level: str = "INFO"
 
     @property
