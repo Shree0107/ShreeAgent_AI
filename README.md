@@ -15,6 +15,10 @@ and a **Claude**-powered agent explains everything in plain language.
 - **News sentiment:** Marketaux / Finnhub / Yahoo headlines scored with FinBERT.
 - **Forecasting:** TimesFM-3 zero-shot, multivariate (related assets such as DXY/NIFTY, plus volume), quantile bands,
   and a rolling **backtest vs a naive baseline** (MAE, MAPE, directional accuracy, interval coverage) so you know how far to trust it.
+- **Beginner signals:** one card per watchlist symbol with a clear **BUY / SELL / WAIT**, plain-language reasons,
+  what to wait for, an exact entry zone, a structure-based stop loss, two targets with % and money, cancel conditions,
+  confidence, event warnings, expiry, an XTB-style position-size helper (lots/shares) and a tracked win rate.
+  BUY/SELL only when the checks agree, no major event is close and reward/risk ≥ 1.5 (configurable).
 - **Agent:** ask *"Analyse EUR/USD for this week"* or *"Is RELIANCE a buy right now?"*. You get a structured report with
   bias, key levels, entry/SL/TP zones, R:R, risks and confidence. Levels are computed in code, not invented by the LLM.
 - **Dashboard (Streamlit):** watchlist, interactive charts, forecast chart with bands, fundamentals, news, agent chat,
@@ -40,6 +44,8 @@ config/       settings (.env), symbol aliases + Investing.com links, FRED series
 data/         provider interfaces + yfinance / Twelve Data / FRED / Finnhub / Marketaux, SQLite cache, DataService
 analysis/     indicators, levels, patterns, technical (multi-timeframe), fundamental, macro_fx, sentiment, trade_plan, combined
 forecasting/  TimesFM-3 + naive models, input features, backtest, metrics, service
+signals/      beginner BUY/SELL/WAIT engine: structure, levels, decision gates, sizing, events, plain-language
+              templates, locked-number LLM polish, SQLite history + outcome tracking
 agent/        LLM providers (Claude, OpenAI-compatible), tools, prompt, agent loop, report export
 alerts/       WhatsApp notifiers, watchlist scanner, scheduler
 ui/           Streamlit dashboard + Plotly charts
