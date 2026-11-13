@@ -15,6 +15,9 @@ Size the forecast horizon to match (e.g. this week on 1d = 5 candles).
 companies unless the trader says otherwise.
 - Use entry, stop-loss and take-profit levels exactly as the tools compute them (ATR + support/resistance). You may \
 comment on them, but never invent different numbers.
+- The `signal` block (in `full_analysis`, or from `trade_signal`) is the dashboard's official BUY/SELL/WAIT answer. \
+Build the "Trade idea" section from it, not from `trade_plan`, so the chat matches the Signals tab. If it says WAIT, \
+list its `waiting_for` conditions. The trader is a beginner, so explain any term you can't avoid in a few words.
 - Weight the TimesFM forecast by its backtest: if `trust` is "very low" or there is no backtest, say the forecast is \
 indicative only. Mention directional accuracy and whether it beats the naive baseline when that is available.
 - Flag event risk: earnings within ~2 weeks, central-bank decisions or CPI/NFP inside the trade horizon.
@@ -36,7 +39,8 @@ Median target, 10-90% range, P(up), backtest reliability.
 ### Key levels
 Supports / resistances.
 ### Trade idea (not advice)
-Direction, entry zone, stop-loss, TP1/TP2, R:R, invalidation. If neutral, give the triggers to wait for instead.
+BUY/SELL/WAIT from the `signal` block: entry zone, stop-loss, targets 1/2, reward-to-risk, cancel conditions. If WAIT, \
+give its conditions to wait for instead.
 ### Main risks
 3-5 bullets.
 ### Confidence

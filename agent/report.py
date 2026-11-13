@@ -94,7 +94,23 @@ def analysis_to_markdown(a: dict) -> str:
           "- Resistance: " + (", ".join(_f(l["price"]) for l in kl.get("resistances", [])) or "n/a"),
           "- Support: " + (", ".join(_f(l["price"]) for l in kl.get("supports", [])) or "n/a")]
 
-    L += ["", f"## Trade idea ({tp.get('timeframe')}, not advice)"]
+    sig = a.get("signal")
+    if sig and sig.get("action") in ("BUY", "SELL", "WAIT"):
+        L += ["", f"## Signal: {sig['action']} (daily chart, not advice)", f"**Confidence:** {sig['confidence']}"]
+        L += ["", "Why:"] + [f"- {r}" for r in sig.get("reasons", [])]
+        if sig["action"] == "WAIT":
+            L += ["", "What to wait for:"] + [f"- {w}" for w in sig.get("waiting_for", [])]
+        else:
+            L += ["", f"- **Entry:** {sig['entry']}. {sig['entry_condition']}",
+                  f"- **Stop loss:** {_f(sig['stop_loss'])}: {sig['stop_why']}",
+                  f"- **Target 1:** {_f(sig['target1'])} · **Target 2:** {_f(sig['target2'])} · reward-to-risk "
+                  f"{sig['reward_to_risk'][0]} / {sig['reward_to_risk'][1]}"]
+            L += ["", "Cancel if:"] + [f"- {x}" for x in sig.get("cancel_if", [])]
+        if sig.get("event_warning"):
+            L.append(f"- ⚠️ {sig['event_warning']}")
+        L.append(f"- Valid until {sig['expires_at'][:16].replace('T', ' ')} UTC")
+        tp = {**tp, "direction": "none", "notes": []}   # the signal replaces the older ATR plan below
+    L += ["", f"## Trade idea ({tp.get('timeframe')}, not advice)"] if not sig else []
     if tp.get("direction") in ("long", "short"):
         L += [f"- **{tp['direction'].upper()}** entry {_f(tp['entry_zone'][0])} – {_f(tp['entry_zone'][1])}",
               f"- Stop-loss {_f(tp['stop_loss'])} · TP1 {_f(tp['take_profits'][0])} (R:R {tp['risk_reward'][0]}) · "

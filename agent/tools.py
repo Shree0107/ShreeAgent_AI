@@ -119,8 +119,18 @@ def t_trade_plan(symbol: str, timeframe: str = "1d", bias: str | None = None) ->
 
 def t_full(symbol: str, timeframe: str = "1d", horizon: int = 10, include_forecast: bool = True) -> dict:
     from analysis.combined import full_analysis
+    from signals.service import attach_signal
 
-    return full_analysis(_sym(symbol), timeframe, int(horizon), include_forecast=bool(include_forecast))
+    sym = _sym(symbol)
+    a = attach_signal(sym, full_analysis(sym, timeframe, int(horizon), include_forecast=bool(include_forecast)))
+    # Signal first, so it survives truncation of long tool outputs.
+    return {"signal": a.pop("signal", None), **a}
+
+
+def t_signal(symbol: str) -> dict:
+    from signals.service import build_signal, compact
+
+    return compact(build_signal(_sym(symbol)))
 
 
 def _schema(props: dict, required: list[str]) -> dict:
@@ -138,6 +148,11 @@ TOOLS: list[ToolSpec] = [
              _schema({"symbol": SYM, "timeframe": TF,
                       "horizon": {"type": "integer", "minimum": 1, "maximum": 128, "description": "Forecast candles"},
                       "include_forecast": {"type": "boolean"}}, ["symbol"]), t_full),
+    ToolSpec("trade_signal",
+             "The dashboard's official BUY / SELL / WAIT signal for one symbol (daily chart): plain-language reasons, "
+             "exact entry zone + confirmation, stop loss and why, targets 1/2, reward-to-risk, cancel conditions, "
+             "what to wait for, upcoming events and expiry. Use for 'should I buy/sell X' or 'is there a trade'.",
+             _schema({"symbol": SYM}, ["symbol"]), t_signal),
     ToolSpec("resolve_symbol", "Find ticker candidates for a company or instrument name (US, NSE, BSE, forex).",
              _schema({"query": {"type": "string"}}, ["query"]), t_resolve_symbol),
     ToolSpec("get_quote", "Latest daily close, % change, data source and Investing.com cross-check link.",

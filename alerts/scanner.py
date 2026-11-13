@@ -34,6 +34,7 @@ class ScanRow:
     plan: dict
     flags: list[str]
     error: str = ""
+    signal: dict | None = None   # compact beginner signal (signals.service.compact)
 
 
 def _state_path():
@@ -53,6 +54,14 @@ def scan(symbols: list[str] | None = None, include_forecast: bool | None = None,
     symbols = symbols or Watchlist().symbols()
     state = _load_state()
     rows: list[ScanRow] = []
+    # Beginner signals (same cards as the Signals tab); also updates the signal history results.
+    signals: dict[str, dict] = {}
+    try:
+        from signals.service import compact, watchlist_signals
+
+        signals = {c["symbol"]: compact(c) for c in watchlist_signals(symbols, data=data)}
+    except Exception as e:
+        log.warning("Signal cards unavailable for the scan: %s", e)
     for tk in symbols:
         try:
             sym = resolve(tk)
@@ -67,9 +76,14 @@ def scan(symbols: list[str] | None = None, include_forecast: bool | None = None,
                 flags.append(f"bias changed {prev}→{c['bias']}")
             if rsi is not None and (rsi >= 75 or rsi <= 25):
                 flags.append(f"RSI {rsi:.0f} extreme")
+            sig = signals.get(sym.ticker)
+            if sig and sig.get("action") in ("BUY", "SELL") and state.get(f"{sym.ticker}#signal") != sig["action"]:
+                flags.append(f"new {sig['action']} signal")
             rows.append(ScanRow(sym.ticker, a["price"], c["score"], c["bias"], c["confidence"], prev, rsi,
-                                a["trade_plan"], flags))
+                                a["trade_plan"], flags, signal=sig))
             state[sym.ticker] = c["bias"]
+            if sig:
+                state[f"{sym.ticker}#signal"] = sig.get("action")
         except Exception as e:
             log.warning("Scan failed for %s: %s", tk, e)
             rows.append(ScanRow(tk, None, 0, "n/a", "n/a", None, None, {}, [], str(e)))
@@ -91,6 +105,16 @@ def format_digest(rows: list[ScanRow], only_flagged: bool = False) -> str:
         lines.append(f"{icon} *{r.symbol}* {r.price:g} | {r.bias} {r.score:+.0f} ({r.confidence})")
         if r.flags:
             lines.append("   ⚡ " + ", ".join(r.flags))
+        sig = r.signal or {}
+        if sig.get("action") in ("BUY", "SELL"):
+            rr = sig.get("reward_to_risk") or [0]
+            lines.append(f"   👉 *{sig['action']}* {sig['entry'].split(' between ')[-1].replace(' and ', '-')} · "
+                         f"SL {sig['stop_loss']:g} · TP1 {sig['target1']:g} / TP2 {sig['target2']:g} "
+                         f"(risk 1 → make {rr[0]:g})")
+            continue
+        if sig.get("action") == "WAIT":
+            lines.append(f"   👉 *WAIT*: {(sig.get('waiting_for') or ['no clear setup'])[0]}")
+            continue
         p = r.plan or {}
         if p.get("direction") in ("long", "short"):
             lines.append(f"   {p['direction']} {p['entry_zone'][0]:g}-{p['entry_zone'][1]:g} SL {p['stop_loss']:g} "

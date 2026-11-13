@@ -80,3 +80,25 @@ def test_digest_format():
         "risk_reward": [2.0, 4.0]}, ["strong bullish", "bias changed neutral→bullish"])]
     msg = format_digest(rows)
     assert "EUR/USD" in msg and "SL 1.075" in msg and "not financial advice" in msg
+
+
+def test_digest_shows_beginner_signal():
+    sig = {"symbol": "EUR/USD", "action": "BUY", "entry": "Buy between 1.0970 and 1.1000", "stop_loss": 1.088,
+           "target1": 1.1172, "target2": 1.1292, "reward_to_risk": [1.78, 2.92]}
+    wait = {"symbol": "GBP/USD", "action": "WAIT", "waiting_for": ["Wait until after the US inflation report tomorrow"]}
+    rows = [ScanRow("EUR/USD", 1.1, 50, "bullish", "High", None, 55, {}, [], signal=sig),
+            ScanRow("GBP/USD", 1.3, 10, "neutral", "Low", None, 50, {}, [], signal=wait)]
+    msg = format_digest(rows)
+    assert "*BUY* 1.0970-1.1000 · SL 1.088 · TP1 1.1172 / TP2 1.1292 (risk 1 → make 1.78)" in msg
+    assert "*WAIT*: Wait until after the US inflation report tomorrow" in msg
+
+
+def test_report_uses_signal_block_and_agent_tool_registered():
+    from signals.service import attach_signal
+
+    a = attach_signal(parse_symbol("EUR/USD"), full_analysis(parse_symbol("EUR/USD"), "1d", 5, data=FakeData()),
+                      data=FakeData())
+    assert a["signal"]["action"] in ("BUY", "SELL", "WAIT")
+    md = analysis_to_markdown(a)
+    assert f"## Signal: {a['signal']['action']}" in md and "## Trade idea" not in md
+    assert "trade_signal" in [t.name for t in TOOLS]
