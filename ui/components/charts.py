@@ -123,6 +123,29 @@ def forecast_chart(df: pd.DataFrame, fc: dict, history_bars: int = 150) -> go.Fi
     return _layout(fig, 460)
 
 
+def signal_chart(df: pd.DataFrame, card: dict, bars: int = 120) -> go.Figure:
+    """Daily candles with the signal's entry zone, stop loss and targets drawn on."""
+    d = df.tail(bars)
+    fig = go.Figure(go.Candlestick(
+        x=d.index, open=d.open, high=d.high, low=d.low, close=d.close, name="Price",
+        increasing=dict(line=dict(color=UP, width=1), fillcolor=UP),
+        decreasing=dict(line=dict(color=DOWN, width=1), fillcolor=DOWN)))
+    lv = card.get("levels") or {}
+    if lv:
+        lo, hi = sorted((lv["entry_low"], lv["entry_high"]))
+        fig.add_hrect(y0=lo, y1=hi, fillcolor=SERIES[0], opacity=0.15, line_width=0,
+                      annotation_text="Entry zone", annotation_position="top left")
+        fig.add_hline(y=lv["stop"], line=dict(color=DOWN, width=2, dash="dash"),
+                      annotation_text=f"Stop {lv['stop']:g}", annotation_position="bottom right")
+        for i, k in enumerate(("target1", "target2"), start=1):
+            fig.add_hline(y=lv[k], line=dict(color=UP, width=2 if i == 1 else 1, dash="dash"),
+                          annotation_text=f"Target {i} {lv[k]:g}", annotation_position="top right")
+    if len(d) > 2 and (d.index[1] - d.index[0]) >= pd.Timedelta(days=1):
+        fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
+    fig.update_layout(title=f"{card['symbol']} · daily · {card['action']}" + ("" if lv else " (levels shown when BUY/SELL)"))
+    return _layout(fig, 420)
+
+
 def score_bar(components: dict[str, float]) -> go.Figure:
     names = list(components)
     vals = [components[n] for n in names]

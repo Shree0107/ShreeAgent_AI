@@ -72,8 +72,10 @@ def load_forecast(ticker: str, tf: str, horizon: int, multivariate: bool) -> dic
 @st.cache_data(ttl=1800, show_spinner=False)
 def load_full(ticker: str, tf: str, horizon: int, with_fc: bool) -> dict:
     from analysis.combined import full_analysis
+    from signals.service import attach_signal
 
-    return full_analysis(resolve(ticker), tf, horizon, include_forecast=with_fc)
+    sym = resolve(ticker)
+    return attach_signal(sym, full_analysis(sym, tf, horizon, include_forecast=with_fc))
 
 
 def fmt(x, nd=4):
@@ -173,35 +175,120 @@ with tabs[0]:
 
 # ---------------- Signals ----------------
 with tabs[1]:
+    from signals.history import SignalHistory
+    from signals.service import sort_cards, watchlist_signals, with_sizing
+    from ui.components.signal_card import (
+        card_html, history_tables, inject_css, render_details, render_glossary,
+    )
+
+    inject_css()
+    st.markdown("### Today's signals")
+    st.caption("One card per symbol: what to do, why, and the exact prices. The full analysis runs in the background. "
+               "Open **Show details** on a card to see the technical data behind it.")
+
+    # ---- position size helper (remembered for this session) ----
+    with st.container(border=True):
+        st.markdown("**🧮 Position size helper**: how much to trade so a stop-loss hit costs only what you choose")
+        p1, p2, p3 = st.columns(3)
+        acct = p1.number_input("Account size", min_value=1.0, value=float(S.account_size), step=100.0, key="acct")
+        risk = p2.number_input("Risk per trade (%)", min_value=0.1, max_value=10.0, step=0.25,
+                               value=float(S.risk_per_trade_pct), key="riskpct",
+                               help="Beginners usually risk 0.5–2% of the account on one trade.")
+        ccys = ["EUR", "USD", "GBP", "INR", "CHF", "PLN"]
+        default_ccy = S.account_currency.upper() if S.account_currency.upper() in ccys else "EUR"
+        acct_ccy = p3.selectbox("Account currency", ccys, index=ccys.index(default_ccy), key="acctccy")
+        st.caption(f"If the stop loss is hit you lose about **{acct * risk / 100:,.2f} {acct_ccy}**. "
+                   f"Forex sizes follow XTB rules: 1 lot = 100,000 units, smallest trade {S.fx_min_lot} lots, "
+                   f"margin at 1:{S.leverage:g}.")
+
+    f1, f2 = st.columns([3, 1])
+    st.session_state.setdefault("sig_refresh", 0)
+    if f2.button("🔄 Refresh signals", width="stretch", help="Re-run the full analysis now (TimesFM takes a few seconds per symbol)"):
+        st.session_state.sig_refresh += 1
+        st.session_state["sig_force"] = True
+
+    @st.cache_data(ttl=300, show_spinner=False)
+    def load_signal_cards(symbols: tuple[str, ...], refresh: int, force: bool) -> list[dict]:
+        return watchlist_signals(list(symbols), force=force)
+
+    syms = list(wl.symbols())
+    if ticker not in syms:
+        syms.append(ticker)  # the symbol open in the sidebar gets a card too
     try:
-        t = load_technical(ticker)
-        icon = {"bullish": "🟢", "bearish": "🔴", "neutral": "⚪"}
-        st.markdown(f"### {icon[t['bias']]} Multi-timeframe: **{t['bias'].upper()}** (score {t['score']:+.0f}, {t['alignment']})")
-        rows = [{"Timeframe": k, "Bias": f"{icon[v['bias']]} {v['bias']}", "Score": v["score"],
-                 "Trend": f"{v['trend']} ({v['trend_strength']})", "RSI": v["snapshot"]["rsi_14"],
-                 "ADX": v["snapshot"]["adx"], "ATR %": v["snapshot"]["atr_pct"]} for k, v in t["timeframes"].items()]
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
-        sel = t["timeframes"].get(tf) or next(iter(t["timeframes"].values()))
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown(f"**Reasoning ({sel['timeframe']})**")
-            for r in sel["reasons"]:
-                st.markdown(f"- {r}")
-            if sel["patterns"]:
-                st.markdown("**Recent candlestick patterns**")
-                for p in sel["patterns"][-6:]:
-                    st.markdown(f"- {p['date'][:16]} · {p['name']} ({p['direction']})")
-        with c2:
-            st.markdown("**Support / resistance**")
-            st.dataframe(pd.DataFrame(
-                [{"Level": "R", **l} for l in reversed(sel["resistances"])] + [{"Level": "S", **l} for l in sel["supports"]]),
-                hide_index=True, width="stretch")
-            st.markdown("**Indicator snapshot**")
-            st.json(sel["snapshot"], expanded=False)
-        if t.get("errors"):
-            st.caption("Unavailable timeframes: " + "; ".join(f"{k}: {v}" for k, v in t["errors"].items()))
+        with st.spinner("Updating signals (first run loads the forecasting model, about 30 s)…"):
+            cards = load_signal_cards(tuple(syms), st.session_state.sig_refresh, st.session_state.pop("sig_force", False))
     except Exception as e:
-        st.error(f"Technical analysis failed: {e}")
+        cards = []
+        st.error(f"Signals unavailable: {e}")
+
+    counts = {k: sum(1 for c in cards if c.get("action") == k) for k in ("BUY", "SELL", "WAIT")}
+    flt = f1.radio("Show", ["All", "Buy", "Sell", "Wait"], horizontal=True, key="sig_filter",
+                   format_func=lambda x: x if x == "All" else f"{x} ({counts[x.upper()]})")
+    shown = [c for c in sort_cards(cards) if flt == "All" or c.get("action") == flt.upper()]
+    hist = SignalHistory()
+    wins = hist.win_rates()
+    if not shown:
+        st.info("No signals match this filter." if cards else "Add symbols to your watchlist in the sidebar to see signals.")
+    for i, c in enumerate(shown):
+        if c.get("action") in ("BUY", "SELL"):
+            try:
+                c = with_sizing(c, acct, risk, acct_ccy)
+            except Exception as e:
+                st.caption(f"Position size unavailable: {e}")
+        with st.container(border=True):
+            if c["symbol"] not in wl.symbols():
+                st.caption("Not in your watchlist: shown because it's open in the sidebar")
+            st.markdown(card_html(c, wins.get(c["symbol"])), unsafe_allow_html=True)
+            if c.get("action") != "ERROR":
+                render_glossary(f"g{i}", c.get("is_fx", False))
+                with st.expander("Show details"):
+                    render_details(c, f"{i}_{c['symbol']}", load_ohlcv, load_forecast)
+
+    # ---- history & win rate ----
+    with st.expander("📊 Signal history & win rate"):
+        rows = hist.history(limit=300)
+        if not rows:
+            st.caption("No BUY/SELL signals recorded yet. Every BUY/SELL card is saved automatically and checked against "
+                       "later prices: hit target, hit stop or expired.")
+        else:
+            wr_df, hist_df = history_tables(rows, wins)
+            st.markdown("**Win rate per symbol** (target hits ÷ (target hits + stop hits). Expired signals aren't counted.)")
+            st.dataframe(wr_df, hide_index=True, width="stretch")
+            st.markdown("**All signals**")
+            st.dataframe(hist_df, hide_index=True, width="stretch")
+            st.download_button("⬇ Download history (.csv)", hist_df.to_csv(index=False), file_name="signal_history.csv")
+
+    # ---- the previous per-symbol technical view, unchanged ----
+    with st.expander(f"🔬 Technical breakdown for {ticker} ({tf})"):
+        try:
+            t = load_technical(ticker)
+            icon = {"bullish": "🟢", "bearish": "🔴", "neutral": "⚪"}
+            st.markdown(f"### {icon[t['bias']]} Multi-timeframe: **{t['bias'].upper()}** (score {t['score']:+.0f}, {t['alignment']})")
+            rows = [{"Timeframe": k, "Bias": f"{icon[v['bias']]} {v['bias']}", "Score": v["score"],
+                     "Trend": f"{v['trend']} ({v['trend_strength']})", "RSI": v["snapshot"]["rsi_14"],
+                     "ADX": v["snapshot"]["adx"], "ATR %": v["snapshot"]["atr_pct"]} for k, v in t["timeframes"].items()]
+            st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+            sel = t["timeframes"].get(tf) or next(iter(t["timeframes"].values()))
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown(f"**Reasoning ({sel['timeframe']})**")
+                for r in sel["reasons"]:
+                    st.markdown(f"- {r}")
+                if sel["patterns"]:
+                    st.markdown("**Recent candlestick patterns**")
+                    for p in sel["patterns"][-6:]:
+                        st.markdown(f"- {p['date'][:16]} · {p['name']} ({p['direction']})")
+            with c2:
+                st.markdown("**Support / resistance**")
+                st.dataframe(pd.DataFrame(
+                    [{"Level": "R", **l} for l in reversed(sel["resistances"])] + [{"Level": "S", **l} for l in sel["supports"]]),
+                    hide_index=True, width="stretch")
+                st.markdown("**Indicator snapshot**")
+                st.json(sel["snapshot"], expanded=False)
+            if t.get("errors"):
+                st.caption("Unavailable timeframes: " + "; ".join(f"{k}: {v}" for k, v in t["errors"].items()))
+        except Exception as e:
+            st.error(f"Technical analysis failed: {e}")
 
 # ---------------- Forecast ----------------
 with tabs[2]:
