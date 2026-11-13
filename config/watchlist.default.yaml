@@ -1,0 +1,4 @@
+# Default watchlist, copied to user_data/watchlist.yaml on first run.
+# Edit the watchlist from the dashboard sidebar, or edit user_data/watchlist.yaml directly.
+symbols:
+  - EUR/USD

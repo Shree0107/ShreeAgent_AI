@@ -1,0 +1,45 @@
+# Symbol aliases and Investing.com links.
+# - aliases: words you might type -> canonical ticker (Yahoo-style for stocks)
+# - investing: path on investing.com used for the manual cross-check link.
+#   If a symbol isn't listed, the report links to an Investing.com search instead.
+
+forex:
+  "EUR/USD": {investing: currencies/eur-usd}
+  "GBP/USD": {investing: currencies/gbp-usd}
+  "USD/JPY": {investing: currencies/usd-jpy}
+  "USD/CHF": {investing: currencies/usd-chf}
+  "AUD/USD": {investing: currencies/aud-usd}
+  "NZD/USD": {investing: currencies/nzd-usd}
+  "USD/CAD": {investing: currencies/usd-cad}
+  "USD/INR": {investing: currencies/usd-inr}
+  "EUR/GBP": {investing: currencies/eur-gbp}
+  "EUR/JPY": {investing: currencies/eur-jpy}
+  "GBP/JPY": {investing: currencies/gbp-jpy}
+  "XAU/USD": {investing: currencies/xau-usd}
+  "XAG/USD": {investing: currencies/xag-usd}
+
+stocks:
+  "RELIANCE.NS": {investing: equities/reliance-industries, aliases: [reliance, "reliance industries", ril]}
+  "TCS.NS": {investing: equities/tata-consultancy-services, aliases: [tcs, "tata consultancy"]}
+  "INFY.NS": {investing: equities/infosys, aliases: [infosys, infy]}
+  "HDFCBANK.NS": {investing: equities/hdfc-bank-ltd, aliases: ["hdfc bank", hdfcbank]}
+  "ICICIBANK.NS": {investing: equities/icici-bank-ltd, aliases: ["icici bank", icicibank]}
+  "SBIN.NS": {investing: equities/state-bank-of-india, aliases: [sbi, "state bank of india"]}
+  "ITC.NS": {investing: equities/itc, aliases: [itc]}
+  "AAPL": {investing: equities/apple-computer-inc, aliases: [apple]}
+  "MSFT": {investing: equities/microsoft-corp, aliases: [microsoft]}
+  "NVDA": {investing: equities/nvidia-corp, aliases: [nvidia]}
+  "GOOGL": {investing: equities/google-inc, aliases: [google, alphabet]}
+  "AMZN": {investing: equities/amazon-com-inc, aliases: [amazon]}
+  "TSLA": {investing: equities/tesla-motors, aliases: [tesla]}
+  "META": {investing: equities/facebook-inc, aliases: [meta, facebook]}
+
+# Related assets used as extra series for multivariate TimesFM forecasts.
+related:
+  "EUR/USD": ["DX-Y.NYB"]
+  "GBP/USD": ["DX-Y.NYB"]
+  "USD/JPY": ["DX-Y.NYB"]
+  "XAU/USD": ["DX-Y.NYB"]
+  "_NSE": ["^NSEI"]
+  "_BSE": ["^BSESN"]
+  "_US": ["^GSPC"]

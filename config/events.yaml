@@ -1,0 +1,17 @@
+# Curated high-impact events (central bank decisions etc.).
+# US data release dates (CPI, NFP, GDP, PCE, retail sales, PPI) are fetched from FRED automatically.
+# Keep this file up to date from the official calendars:
+#   Fed:  https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
+#   ECB:  https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html
+#   BoE:  https://www.bankofengland.co.uk/monetary-policy/upcoming-mpc-dates
+#   BoJ:  https://www.boj.or.jp/en/mopo/mpmsche_minu/index.htm
+#   RBI:  https://www.rbi.org.in (Monetary Policy -> MPC meeting schedule)
+# The dates below were entered from memory. Check them against the links above before relying on them.
+# date: decision day (YYYY-MM-DD), currency: affected currency, impact: high|medium
+
+events:
+  - {date: 2026-12-09, currency: USD, title: "FOMC rate decision", impact: high}
+  - {date: 2026-12-17, currency: EUR, title: "ECB monetary policy decision", impact: high}
+  - {date: 2026-12-17, currency: GBP, title: "BoE MPC rate decision", impact: high}
+  - {date: 2026-12-18, currency: JPY, title: "BoJ policy decision", impact: high}
+  - {date: 2026-12-04, currency: INR, title: "RBI MPC policy decision", impact: high}

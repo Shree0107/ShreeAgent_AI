@@ -1,0 +1,10 @@
+[project]
+name = "shreeagent-ai"
+version = "1.0.0"
+description = "Personal AI trading-analysis assistant: technicals, fundamentals, TimesFM-3 forecasts, Claude agent. Analysis only, never places trades."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning", "ignore::UserWarning"]

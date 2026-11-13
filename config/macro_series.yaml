@@ -1,0 +1,86 @@
+# FRED series used for forex fundamentals, per currency.
+#   policy_rate : central bank policy rate (percent)
+#   cpi         : consumer price INDEX (YoY inflation is computed from it)
+#   bond_10y    : 10-year government bond yield (percent)
+#   gdp         : real GDP level (YoY growth is computed from it)
+# Find or verify series at https://fred.stlouisfed.org (search the name and copy the ID).
+# If FRED discontinues a series, the app shows "n/a" for it. Replace the ID here.
+# inflation_target: central bank target (percent), used for the hawkish/dovish lean.
+
+USD:
+  name: United States
+  central_bank: Federal Reserve
+  policy_rate: DFF
+  cpi: CPIAUCSL
+  bond_10y: DGS10
+  gdp: GDPC1
+  inflation_target: 2.0
+EUR:
+  name: Euro Area
+  central_bank: ECB
+  policy_rate: ECBDFR
+  cpi: CP0000EZ19M086NEST
+  bond_10y: IRLTLT01EZM156N
+  gdp: CLVMNACSCAB1GQEA19
+  inflation_target: 2.0
+GBP:
+  name: United Kingdom
+  central_bank: Bank of England
+  policy_rate: IRSTCB01GBM156N
+  cpi: GBRCPIALLMINMEI
+  bond_10y: IRLTLT01GBM156N
+  gdp: CLVMNACSCAB1GQUK
+  inflation_target: 2.0
+JPY:
+  name: Japan
+  central_bank: Bank of Japan
+  policy_rate: IRSTCB01JPM156N
+  cpi: JPNCPIALLMINMEI
+  bond_10y: IRLTLT01JPM156N
+  gdp: JPNRGDPEXP
+  inflation_target: 2.0
+CHF:
+  name: Switzerland
+  central_bank: Swiss National Bank
+  policy_rate: IRSTCB01CHM156N
+  cpi: CHECPIALLMINMEI
+  bond_10y: IRLTLT01CHM156N
+  gdp: CLVMNACSAB1GQCH
+  inflation_target: 1.0
+AUD:
+  name: Australia
+  central_bank: Reserve Bank of Australia
+  policy_rate: IRSTCB01AUM156N
+  cpi: AUSCPIALLQINMEI
+  bond_10y: IRLTLT01AUM156N
+  gdp: NGDPRSAXDCAUQ
+  inflation_target: 2.5
+CAD:
+  name: Canada
+  central_bank: Bank of Canada
+  policy_rate: IRSTCB01CAM156N
+  cpi: CANCPIALLMINMEI
+  bond_10y: IRLTLT01CAM156N
+  gdp: NGDPRSAXDCCAQ
+  inflation_target: 2.0
+NZD:
+  name: New Zealand
+  central_bank: Reserve Bank of New Zealand
+  policy_rate: IRSTCB01NZM156N
+  cpi: NZLCPIALLQINMEI
+  bond_10y: IRLTLT01NZM156N
+  gdp: NAEXKP01NZQ189S
+  inflation_target: 2.0
+INR:
+  name: India
+  central_bank: Reserve Bank of India
+  policy_rate: IRSTCB01INM156N
+  cpi: INDCPIALLMINMEI
+  bond_10y: INDIRLTLT01STM
+  gdp: NGDPRNSAXDCINQ
+  inflation_target: 4.0
+
+# Extra USD-side drivers used for gold (XAU) and silver (XAG).
+gold_drivers:
+  real_yield_10y: DFII10
+  usd_broad_index: DTWEXBGS

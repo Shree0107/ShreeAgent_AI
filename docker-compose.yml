@@ -1,0 +1,31 @@
+# docker compose up -d                       -> dashboard at http://localhost:8501
+# docker compose --profile alerts up -d      -> also runs the daily WhatsApp scan
+# GPU: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+services:
+  app:
+    build: .
+    image: shreeagent-ai
+    env_file: .env
+    ports:
+      - "8501:8501"
+    volumes:
+      - hf-models:/models/hf          # TimesFM / FinBERT weights (downloaded once)
+      - app-cache:/app/.cache          # market data cache, logs, backtest results
+      - ./user_data:/app/user_data     # your watchlist (editable from the host)
+    restart: unless-stopped
+
+  scheduler:
+    image: shreeagent-ai
+    profiles: ["alerts"]
+    depends_on: [app]
+    env_file: .env
+    command: ["python", "-m", "alerts.scheduler"]
+    volumes:
+      - hf-models:/models/hf
+      - app-cache:/app/.cache
+      - ./user_data:/app/user_data
+    restart: unless-stopped
+
+volumes:
+  hf-models:
+  app-cache:
