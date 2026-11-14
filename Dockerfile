@@ -23,6 +23,8 @@ RUN useradd -m appuser && mkdir -p /models/hf /app/.cache /app/user_data \
     && chown -R appuser /app /models
 USER appuser
 
-EXPOSE 8501
-HEALTHCHECK CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')" || exit 1
-CMD ["streamlit", "run", "ui/app.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.headless=true"]
+# Backend: FastAPI + WebSocket hub + live prices + background jobs, all in one process (python -m server).
+# The classic Streamlit dashboard uses the same image with a different command (see docker-compose.yml).
+EXPOSE 8000 8501
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" || exit 1
+CMD ["python", "-m", "server", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,7 +1,7 @@
 # NVIDIA GPU override (needs the NVIDIA Container Toolkit / Docker Desktop WSL2 GPU support):
 #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 services:
-  app:
+  backend:
     build:
       context: .
       args:

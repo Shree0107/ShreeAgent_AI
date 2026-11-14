@@ -5,6 +5,7 @@ import { decimalsFor, fmtPct, fmtPrice } from '../lib/format'
 import { sessionLabel } from '../lib/sessions'
 import { useApp } from '../lib/store'
 import { describeStatus, useLivePrice } from '../lib/live'
+import { AlertsBell } from './AlertsBell'
 import { useConnection } from '../lib/ws'
 
 function useDebounced<T>(v: T, ms: number): T {
@@ -135,6 +136,7 @@ export function TopBar({ onAskAI }: { onAskAI: () => void }) {
       <span className="text-xs text-muted">{sessionLabel(now)}</span>
       <div className="ml-auto flex items-center gap-3">
         <StatusDot status={status} source={live.price?.source ?? q?.source ?? ''} />
+        <AlertsBell />
         <button onClick={toggleTheme} title="Switch light / dark" className="rounded-md border border-line px-2 py-1 text-sm">
           {theme === 'dark' ? '☀' : '🌙'}
         </button>

@@ -73,6 +73,15 @@ class Settings(BaseSettings):
     scan_include_forecast: bool = False
     alert_score_threshold: float = 40.0
 
+    # ---- Trade-plan alerts (phase 10): Telegram + browser notifications ----
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    # which plan events alert you: get_ready, entry_triggered, tp_hit, sl_hit, breakeven, time_stop, cancelled,
+    # expired (or "all")
+    alert_events: str = "get_ready,entry_triggered,tp_hit,sl_hit,cancelled"
+    alert_dedupe_minutes: int = 30
+    alerts_whatsapp: bool = False    # also send trade-plan alerts to WhatsApp (uses WHATSAPP_BACKEND)
+
     # ---- Beginner signals (Signals tab) ----
     signal_timeframe: str = "1d"            # chart the entry/stop/targets are built on
     signal_forecast_horizon: int = 10       # TimesFM candles used in the decision
