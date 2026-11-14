@@ -267,7 +267,8 @@ def run_backtest(ticker: str, months: int | None = None, setups: list[str] | Non
     span_days = (data_end - start).days
     if not (src.get("5m") or {}).get("bid_ask"):
         notes.append("No bid/ask prices in the history: buys and sells are filled at the middle price plus half of "
-                     f"the typical spread ({cfg.typical_spread_for(sym.ticker):g} pips).")
+                     f"the typical spread ({cfg.typical_spread_for(sym.ticker):g} pip{'' if cfg.typical_spread_for(sym.ticker) == 1 else 's'}, "
+                     "set by TYPICAL_SPREAD_PIPS).")
     if span_days < 120:
         notes.append(f"Only {span_days} days of 5-minute history were available (Yahoo keeps about 60 days). "
                      "For a proper 12 + 3 month walk-forward test, add an OANDA token and run "
