@@ -19,6 +19,7 @@ import pandas as pd
 
 from config.settings import get_settings
 from forecasting import metrics as M
+from forecasting.baselines import baseline_paths
 from forecasting.features import build_inputs
 from forecasting.models import Forecaster, NaiveForecaster
 
@@ -42,6 +43,10 @@ class BacktestResult:
     trust: str
     run_at: str
     multivariate: bool = False
+    # Added in phase 9 (optional so older saved results still load):
+    coverage_50: float | None = None          # % of actual prices inside the 25-75% (middle half) range
+    baselines: dict | None = None             # {"naive"|"drift"|"moving_average": {mae, mape, directional_accuracy}}
+    variates: list | None = None              # input series used ("close", related tickers)
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -80,8 +85,9 @@ def run_backtest(
         raise ValueError(f"Not enough history for a backtest ({n} bars, horizon {horizon})")
 
     contexts, covs, actuals, lasts = [], [], [], []
+    names: list[str] = ["close"]
     for o in origins:
-        ctx, cov, _ = build_inputs(df, ctx_len, related, use_volume, end=o)
+        ctx, cov, names = build_inputs(df, ctx_len, related, use_volume, end=o)
         contexts.append(ctx)
         covs.append(cov)
         actuals.append(df["close"].iloc[o : o + horizon].to_numpy())
@@ -101,6 +107,17 @@ def run_backtest(
     skill = 1 - mae / naive_mae if naive_mae > 0 else 0.0
     dir_acc = M.directional_accuracy(lasts, [a[-1] for a in actuals], [p.median[-1] for p in preds])
     cov80 = M.coverage(A, LO, HI)
+    cov50 = M.coverage(A, np.concatenate([p.q25 for p in preds]), np.concatenate([p.q75 for p in preds]))
+
+    # Simple baselines on exactly the same windows (only the target's own closes up to each origin).
+    base: dict[str, dict] = {}
+    targets = [np.atleast_2d(c)[0] for c in contexts]
+    for name in ("naive", "drift", "moving_average"):
+        paths = [baseline_paths(y, horizon)[name] for y in targets]
+        BP = np.concatenate(paths)
+        base[name] = {"mae": round(M.mae(A, BP), 6), "mape": round(M.mape(A, BP), 3),
+                      "directional_accuracy": round(M.directional_accuracy(
+                          lasts, [a[-1] for a in actuals], [p[-1] for p in paths]), 1)}
     return BacktestResult(
         symbol=symbol, timeframe=timeframe, horizon=horizon, model=forecaster.name, n_windows=len(origins),
         mae=round(mae, 6), mape=round(M.mape(A, P), 3), directional_accuracy=round(dir_acc, 1),
@@ -108,6 +125,7 @@ def run_backtest(
         skill_vs_naive=round(skill, 3), trust=trust_label(skill, dir_acc, cov80, len(origins)),
         run_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         multivariate=bool(related) or use_volume,
+        coverage_50=round(cov50, 1), baselines=base, variates=list(names),
     )
 
 

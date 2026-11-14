@@ -53,6 +53,13 @@ class Settings(BaseSettings):
     hf_token: str = ""
     forecast_horizons: str = "5,10,30"
 
+    # ---- Forecast tab (phase 9) ----
+    forecast_tab_horizons: str = "15m:16,1h:24,4h:30,1d:10"  # candles ahead per timeframe
+    forecast_multivariate: str = "auto"   # auto (keep related series only if past tests say they help) | on | off
+    forecast_check_hours: float = 24.0    # re-run the model-vs-baselines check this often
+    forecast_check_windows: int = 20      # past test windows in that check
+    forecast_watch_minutes: int = 120     # keep re-forecasting a symbol/timeframe this long after it was viewed
+
     # ---- Sentiment ----
     sentiment_model: str = "finbert"  # finbert | lexicon
 
@@ -112,6 +119,15 @@ class Settings(BaseSettings):
     @property
     def horizons(self) -> list[int]:
         return [int(h) for h in self.forecast_horizons.split(",") if h.strip()]
+
+    @property
+    def forecast_tab_horizon_map(self) -> dict[str, int]:  # phase 9
+        out = {}
+        for part in self.forecast_tab_horizons.split(","):
+            tf, _, h = part.partition(":")
+            if tf.strip() and h.strip().isdigit():
+                out[tf.strip()] = int(h)
+        return out
 
 
 @lru_cache(maxsize=1)

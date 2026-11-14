@@ -35,11 +35,15 @@ stocks:
   "META": {investing: equities/facebook-inc, aliases: [meta, facebook]}
 
 # Related assets used as extra series for multivariate TimesFM forecasts.
+# Forex uses other dollar pairs (the dollar index DX-Y.NYB returns no data from Yahoo any more).
+# A series that can't be loaded, or doesn't overlap the target's candles, is skipped automatically, and the
+# Forecast tab keeps the extra series only if they made past forecasts more accurate.
 related:
-  "EUR/USD": ["DX-Y.NYB"]
-  "GBP/USD": ["DX-Y.NYB"]
-  "USD/JPY": ["DX-Y.NYB"]
-  "XAU/USD": ["DX-Y.NYB"]
+  "EUR/USD": ["GBP/USD", "USD/CHF", "USD/JPY"]
+  "GBP/USD": ["EUR/USD", "USD/CHF", "USD/JPY"]
+  "USD/JPY": ["EUR/USD", "USD/CHF"]
+  "USD/CHF": ["EUR/USD", "GBP/USD"]
+  "XAU/USD": ["EUR/USD", "XAG/USD"]
   "_NSE": ["^NSEI"]
   "_BSE": ["^BSESN"]
   "_US": ["^GSPC"]

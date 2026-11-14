@@ -13,6 +13,8 @@ vi.mock('./components/chart/PriceChart', async () => {
   }
 })
 
+vi.mock('./components/forecast/ForecastChart', () => ({ ForecastChart: () => <div data-testid="forecast-chart-stub" /> }))
+
 // No real WebSocket in tests.
 vi.mock('./lib/ws', async () => {
   const { create } = await import('zustand')
@@ -62,7 +64,7 @@ describe('App shell', () => {
     await waitFor(() => expect(screen.getByTestId('price-chart')).toHaveTextContent('heikin'))
     expect(screen.getByRole('button', { name: '15m' })).toBeDisabled()
     await user.click(screen.getByRole('tab', { name: 'Forecast' }))
-    expect(await screen.findByText(/TimesFM-3 forecasts/)).toBeInTheDocument()
+    expect(await screen.findByRole('group', { name: 'Forecast timeframe' })).toBeInTheDocument()
   })
 
   it('searches symbols and opens the result', async () => {
