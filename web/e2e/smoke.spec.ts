@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { forexOpen } from '../src/lib/sessions'
 
 test.beforeAll(async ({ request }) => {
   // Warm every endpoint the page calls once, so the timing below measures normal use rather than the first
@@ -42,4 +43,18 @@ test('timeframe, chart type and indicators', async ({ page }, info) => {
   await page.getByTestId('price-chart').click()
   await expect(page.getByText(/candles · source/)).toBeVisible()
   await page.screenshot({ path: `test-results/chart-${info.project.name}-daily-ha.png` })
+})
+
+test('live status arrives over the WebSocket and intraday timeframes load', async ({ page }, info) => {
+  await page.goto('/')
+  // The status comes from the server via /ws: it must leave "Reconnecting" and never be Offline.
+  // Weekend -> "Market closed"; forex hours -> "Live" (OANDA) or "Delayed" (Yahoo). Never stale-as-live.
+  const expected = forexOpen(new Date()) ? /Live|Delayed/ : /Market closed/
+  await expect(page.getByTestId('status-dot')).toHaveText(expected, { timeout: 30_000 })
+  const status = await page.getByTestId('status-dot').textContent()
+  console.log(`[${info.project.name}] feed status: ${status}`)
+  await page.getByRole('button', { name: '15m', exact: true }).click()
+  await expect(page.getByText(/candles · /)).toBeVisible()
+  await expect(page.getByText(/next candle in \d+:\d\d/)).toBeVisible()
+  await page.screenshot({ path: `test-results/chart-${info.project.name}-15m.png` })
 })

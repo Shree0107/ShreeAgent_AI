@@ -21,7 +21,7 @@ class QuietData(FakeData):
 
 @pytest.fixture
 def client(tmp_path):
-    app = create_app()
+    app = create_app(background=False)
     wl_path = tmp_path / "wl.yaml"
     wl_path.write_text("symbols:\n  - EUR/USD\n", encoding="utf-8")
     hist = SignalHistory(tmp_path / "s.sqlite")
@@ -147,3 +147,19 @@ def test_memory_bus_patterns_and_threads():
         assert [m["data"] for m in got] == [1, 2]
 
     asyncio.run(run())
+
+
+def test_websocket_sends_status_snapshot_on_connect(client):
+    from data.stream.live import LiveService, set_live
+    from api.bus import get_bus
+
+    svc = LiveService(get_bus(), data=QuietData())
+    svc.ensure("EUR/USD")
+    set_live(svc)
+    try:
+        with client.websocket_connect("/ws") as ws:
+            assert ws.receive_json()["topic"] == "hello"
+            snap = ws.receive_json()
+            assert snap["topic"] == "status" and "EUR/USD" in snap["data"]["symbols"]
+    finally:
+        set_live(None)

@@ -9,7 +9,9 @@ import pandas as pd
 
 from data.symbols import Symbol
 
-TIMEFRAMES = ("1h", "4h", "1d", "1wk")
+TIMEFRAMES = ("1m", "5m", "15m", "1h", "4h", "1d", "1wk")
+# Seconds per candle (bars are aligned to UTC).
+TF_SECONDS = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400, "1wk": 604800}
 OHLCV_COLUMNS = ["open", "high", "low", "close", "volume"]
 
 
@@ -54,6 +56,10 @@ class PriceProvider(ABC):
     @abstractmethod
     def get_ohlcv(self, symbol: Symbol, timeframe: str) -> pd.DataFrame:
         """Return a DataFrame indexed by tz-aware UTC timestamps with OHLCV_COLUMNS."""
+
+    def supports(self, symbol: Symbol) -> bool:
+        """False if this provider can't serve the symbol at all (it is then skipped, not counted as a failure)."""
+        return True
 
 
 class FundamentalsProvider(ABC):

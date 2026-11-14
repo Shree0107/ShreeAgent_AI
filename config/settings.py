@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     finnhub_api_key: str = ""
     marketaux_api_key: str = ""
 
+    # ---- Live data (OANDA v20: free practice account gives real-time forex/gold streaming) ----
+    oanda_api_token: str = ""
+    oanda_account_id: str = ""           # optional: discovered from the token when empty
+    oanda_environment: str = "practice"  # practice | live
+    live_enabled: bool = True            # stream / poll prices for open charts and the watchlist
+    live_poll_seconds: int = 15          # polling interval for symbols without a stream (Yahoo, delayed)
+    stale_after_seconds: int = 60        # no new price for this long while the market is open -> "stale"
+
     # ---- Forecasting ----
     forecast_model: str = "timesfm"  # timesfm | naive
     timesfm_checkpoint: str = "google/timesfm-3.0-pytorch"

@@ -58,5 +58,13 @@ export function useCandles(symbol: string, tf: string) {
   /** Apply a live update to the last candle or append a new one (used by the live feed). */
   const applyLive = useCallback((bar: Candle) => setCandles((cur) => mergeCandles(cur, [bar])), [])
 
-  return { candles, source, error, loading, loadMore, applyLive }
+  /** Re-fetch the newest page and merge it in (after a live-feed reconnect, to fill missed candles). */
+  const reload = useCallback(() => {
+    const k = keyRef.current
+    api.candles(symbol, tf, 500)
+      .then((r) => keyRef.current === k && setCandles((cur) => mergeCandles(cur, r.candles)))
+      .catch(() => { /* next live update or reconnect will try again */ })
+  }, [symbol, tf])
+
+  return { candles, source, error, loading, loadMore, applyLive, reload }
 }

@@ -40,3 +40,16 @@ describe('reconnect backoff', () => {
     expect(backoffMs(20, 500, 15000, () => 1)).toBe(15000)
   })
 })
+
+describe('connection / feed status shown in the top bar', async () => {
+  const { describeStatus } = await import('./live')
+  it('never shows stale or delayed data as live', () => {
+    expect(describeStatus('live', 'live', 'oanda').label).toBe('Live')
+    expect(describeStatus('live', 'delayed', 'yfinance').label).toBe('Delayed')
+    expect(describeStatus('live', 'stale', 'oanda')).toMatchObject({ label: 'Stale', tone: 'down' })
+    expect(describeStatus('live', 'closed', 'oanda').label).toBe('Market closed')
+    expect(describeStatus('reconnecting', 'live', 'oanda').label).toBe('Reconnecting')   // server link first
+    expect(describeStatus('offline', 'live', 'oanda').label).toBe('Offline')
+    expect(describeStatus('live', undefined, '').label).toBe('Delayed')
+  })
+})

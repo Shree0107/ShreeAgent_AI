@@ -45,7 +45,7 @@ class FakeData:
         self.drift = drift
 
     def get_ohlcv(self, symbol, timeframe="1d"):
-        freq = {"1h": "h", "4h": "4h", "1d": "D", "1wk": "W"}[timeframe]
+        freq = {"1m": "min", "5m": "5min", "15m": "15min", "1h": "h", "4h": "4h", "1d": "D", "1wk": "W"}[timeframe]
         return make_ohlcv(400, self.drift, seed=hash(timeframe) % 100, freq=freq, volume=symbol.has_real_volume)
 
     def get_ohlcv_ticker(self, ticker, timeframe="1d"):

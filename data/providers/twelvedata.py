@@ -11,7 +11,7 @@ from data.providers.base import PriceProvider, normalise_ohlcv
 from data.symbols import Symbol
 
 _URL = "https://api.twelvedata.com/time_series"
-_TF = {"1h": "1h", "4h": "4h", "1d": "1day", "1wk": "1week"}
+_TF = {"1m": "1min", "5m": "5min", "15m": "15min", "1h": "1h", "4h": "4h", "1d": "1day", "1wk": "1week"}
 
 
 class TwelveDataProvider(PriceProvider):

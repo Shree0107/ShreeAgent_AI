@@ -22,6 +22,20 @@ router = APIRouter()
 HEARTBEAT_S = 15
 
 
+def _ensure_live(topics: set[str]) -> None:
+    """A chart subscribing to price:/candle: topics starts live updates for that symbol (in the background)."""
+    from data.stream.live import get_live
+
+    live = get_live()
+    if not live:
+        return
+    for t in topics:
+        kind, _, rest = t.partition(":")
+        if kind in ("price", "candle", "resync") and rest and "*" not in rest:
+            sym = rest.rsplit(":", 1)[0] if kind == "candle" else rest
+            asyncio.get_running_loop().run_in_executor(None, live.ensure, sym)
+
+
 @router.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
@@ -40,6 +54,12 @@ async def ws_endpoint(ws: WebSocket):
     send_task = asyncio.create_task(sender())
     try:
         q.put_nowait({"topic": "hello", "data": {"ts": time.time(), "heartbeat_s": HEARTBEAT_S}})
+        # Status is only broadcast on change, so a newly connected client gets the current snapshot now.
+        from data.stream.live import get_live
+
+        live = get_live()
+        if live:
+            q.put_nowait({"topic": "status", "data": live.status()})
         while True:
             raw = await ws.receive_text()
             try:
@@ -50,6 +70,7 @@ async def ws_endpoint(ws: WebSocket):
             new = {str(t) for t in m.get("topics") or []}
             if op == "subscribe":
                 topics |= new
+                _ensure_live(new)
             elif op == "unsubscribe":
                 topics -= new
             elif op == "ping":

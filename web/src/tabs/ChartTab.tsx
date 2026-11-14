@@ -4,7 +4,11 @@ import { PriceChart, type PriceChartHandle } from '../components/chart/PriceChar
 import { api } from '../lib/api'
 import { decimalsFor } from '../lib/format'
 import { INDICATORS, TIMEFRAMES, useApp, type ChartType } from '../lib/store'
+import { useLiveCandles, useLivePrice } from '../lib/live'
+import { fmtCountdown } from '../lib/format'
+import { secondsToCandleClose } from '../lib/sessions'
 import { useCandles } from '../lib/useCandles'
+import { useNow } from '../components/TopBar'
 
 const TYPES: { id: ChartType; label: string }[] = [
   { id: 'candles', label: 'Candles' },
@@ -31,7 +35,11 @@ export function ChartTab() {
   const { symbol, tf, setTf, chartType, setChartType, indicators, toggleIndicator, theme } = useApp()
   const { data: supported = ['1h', '4h', '1d', '1wk'] } = useQuery({ queryKey: ['timeframes'], queryFn: api.timeframes, staleTime: Infinity })
   const { data: info } = useQuery({ queryKey: ['symbol', symbol], queryFn: () => api.resolve(symbol), staleTime: Infinity })
-  const { candles, source, error, loading, loadMore } = useCandles(symbol, supported.includes(tf) ? tf : '1h')
+  const activeTf = supported.includes(tf) ? tf : '1h'
+  const { candles, source, error, loading, loadMore, applyLive, reload } = useCandles(symbol, activeTf)
+  useLiveCandles(symbol, activeTf, applyLive, reload)
+  const live = useLivePrice(symbol)
+  const now = useNow(1000)
   const chart = useRef<PriceChartHandle>(null)
   const [menu, setMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -88,7 +96,9 @@ export function ChartTab() {
         <button onClick={screenshot} title="Download a PNG of the chart"
           className="rounded-md border border-line px-2.5 py-1 text-xs font-medium text-muted hover:text-fg">📷 Screenshot</button>
         <span className="ml-auto text-xs text-muted">
-          {loading ? 'Loading…' : `${candles.length} candles · source: ${source || 'n/a'}`}
+          {loading ? 'Loading…' : `${candles.length} candles · ${live.price?.source === 'oanda' ? 'OANDA live' : `source: ${source || 'n/a'}`}`}
+          {live.lastUpdate && <> · last update {new Date(live.lastUpdate).toLocaleTimeString()}</>}
+          {' · next candle in '}<span className="num">{fmtCountdown(secondsToCandleClose(tfSec, now.getTime() / 1000))}</span>
         </span>
       </div>
       <div className="relative min-h-[420px] flex-1 overflow-hidden rounded-lg border border-line bg-panel">

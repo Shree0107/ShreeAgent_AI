@@ -15,6 +15,9 @@ from config.settings import get_settings
 
 # Default TTLs (seconds) per data type
 TTL = {
+    "ohlcv_1m": 30,
+    "ohlcv_5m": 60,
+    "ohlcv_15m": 2 * 60,
     "ohlcv_1h": 15 * 60,
     "ohlcv_4h": 15 * 60,
     "ohlcv_1d": 4 * 3600,

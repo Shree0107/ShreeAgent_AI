@@ -53,10 +53,11 @@ def limiter(provider: str, calls_per_minute: float) -> RateLimiter:
     wait=wait_exponential(multiplier=2, min=2, max=30),
     reraise=True,
 )
-def get_json(url: str, params: dict | None = None, provider: str = "http", cpm: float = 60, timeout: float = 20):
+def get_json(url: str, params: dict | None = None, provider: str = "http", cpm: float = 60, timeout: float = 20,
+             headers: dict | None = None):
     limiter(provider, cpm).wait()
     try:
-        r = _session.get(url, params=params, timeout=timeout)
+        r = _session.get(url, params=params, timeout=timeout, headers=headers)
     except (requests.Timeout, requests.ConnectionError) as e:
         raise TransientProviderError(f"{provider}: network error {e}") from e
     if r.status_code == 429 or r.status_code >= 500:

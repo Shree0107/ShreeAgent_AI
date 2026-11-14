@@ -30,10 +30,11 @@ log = logging.getLogger(__name__)
 
 
 def _price_registry() -> dict[str, type[PriceProvider]]:
+    from data.providers.oanda import OandaProvider
     from data.providers.twelvedata import TwelveDataProvider
     from data.providers.yfinance_provider import YFinanceProvider
 
-    return {"yfinance": YFinanceProvider, "twelvedata": TwelveDataProvider}
+    return {"oanda": OandaProvider, "yfinance": YFinanceProvider, "twelvedata": TwelveDataProvider}
 
 
 class DataService:
@@ -47,7 +48,11 @@ class DataService:
         s = get_settings()
         reg = _price_registry()
         if price_providers is None:
-            price_providers = [reg[n]() for n in (s.price_provider, s.price_fallback_provider) if n in reg]
+            names = [s.price_provider, s.price_fallback_provider]
+            # With an OANDA token, OANDA is the first choice for forex/metals (real bid/ask, tick volume).
+            if s.oanda_api_token and "oanda" not in names:
+                names.insert(0, "oanda")
+            price_providers = [reg[n]() for n in dict.fromkeys(names) if n in reg]
         self.price_providers = price_providers
         self.cache = cache or get_cache()
         self._news = news_providers
@@ -62,6 +67,8 @@ class DataService:
         def fetch():
             errors = []
             for p in self.price_providers:
+                if not p.supports(symbol):
+                    continue
                 try:
                     df = p.get_ohlcv(symbol, timeframe)
                     if not df.empty:

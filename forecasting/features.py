@@ -44,5 +44,6 @@ def future_index(index: pd.DatetimeIndex, horizon: int, timeframe: str) -> pd.Da
     last = index[-1]
     if timeframe == "1d":
         return pd.bdate_range(last + pd.Timedelta(days=1), periods=horizon, tz=last.tz)
-    step = {"1h": pd.Timedelta(hours=1), "4h": pd.Timedelta(hours=4), "1wk": pd.Timedelta(weeks=1)}[timeframe]
+    step = {"1m": pd.Timedelta(minutes=1), "5m": pd.Timedelta(minutes=5), "15m": pd.Timedelta(minutes=15),
+            "1h": pd.Timedelta(hours=1), "4h": pd.Timedelta(hours=4), "1wk": pd.Timedelta(weeks=1)}[timeframe]
     return pd.DatetimeIndex([last + step * (i + 1) for i in range(horizon)])

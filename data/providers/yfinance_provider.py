@@ -24,8 +24,8 @@ from data.symbols import Symbol
 
 log = logging.getLogger(__name__)
 
-# (yfinance interval, period). Yahoo caps 1h history at ~730 days.
-_TF = {"1h": ("1h", "729d"), "4h": ("1h", "729d"), "1d": ("1d", "10y"), "1wk": ("1wk", "20y")}
+# (yfinance interval, period). Yahoo caps history: 1m ~7 days, 5m/15m ~60 days, 1h ~730 days.
+_TF = {"1m": ("1m", "7d"), "5m": ("5m", "59d"), "15m": ("15m", "59d"), "1h": ("1h", "729d"), "4h": ("1h", "729d"), "1d": ("1d", "10y"), "1wk": ("1wk", "20y")}
 
 
 def _num(v):

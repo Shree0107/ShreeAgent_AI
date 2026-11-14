@@ -4,6 +4,7 @@ import { api, type SymbolInfo } from '../lib/api'
 import { decimalsFor, fmtPct, fmtPrice } from '../lib/format'
 import { sessionLabel } from '../lib/sessions'
 import { useApp } from '../lib/store'
+import { describeStatus, useLivePrice } from '../lib/live'
 import { useConnection } from '../lib/ws'
 
 function useDebounced<T>(v: T, ms: number): T {
@@ -96,15 +97,14 @@ function Watchlist() {
   )
 }
 
-function StatusDot({ priceSource }: { priceSource: string }) {
+const TONE = { up: 'bg-up', wait: 'bg-wait', down: 'bg-down', muted: 'bg-muted' } as const
+
+function StatusDot({ status, source }: { status: Parameters<typeof describeStatus>[1]; source: string }) {
   const conn = useConnection((s) => s.state)
-  // Until the OANDA stream is connected, prices come from polled providers: shown honestly as "delayed".
-  const live = conn === 'live' && priceSource === 'oanda'
-  const [label, color] = conn === 'offline' ? ['Offline', 'bg-down'] : conn !== 'live' ? ['Reconnecting', 'bg-wait']
-    : live ? ['Live', 'bg-up'] : ['Delayed', 'bg-wait']
+  const v = describeStatus(conn, status, source)
   return (
-    <span className="flex items-center gap-1.5 text-xs text-muted" title={`Server connection: ${conn} · price source: ${priceSource || 'n/a'}`}>
-      <span className={`inline-block h-2.5 w-2.5 rounded-full ${color} ${live ? 'animate-pulse' : ''}`} />{label}
+    <span className="flex items-center gap-1.5 text-xs text-muted" title={v.help} data-testid="status-dot">
+      <span className={`inline-block h-2.5 w-2.5 rounded-full ${TONE[v.tone]} ${v.pulse ? 'animate-pulse' : ''}`} />{v.label}
     </span>
   )
 }
@@ -112,20 +112,29 @@ function StatusDot({ priceSource }: { priceSource: string }) {
 export function TopBar({ onAskAI }: { onAskAI: () => void }) {
   const { symbol, theme, toggleTheme } = useApp()
   const now = useNow(30_000)
-  const { data: q } = useQuery({ queryKey: ['quote', symbol], queryFn: () => api.quote(symbol), refetchInterval: 30_000 })
+  const { data: q } = useQuery({ queryKey: ['quote', symbol], queryFn: () => api.quote(symbol), refetchInterval: 60_000 })
+  const live = useLivePrice(symbol)
   const dec = decimalsFor(symbol, q?.price)
+  // % change keeps the quote's base (previous day close) but follows the live price.
+  const base = q ? q.price / (1 + q.change_pct / 100) : null
+  const price = live.price?.mid ?? q?.price
+  const chg = price !== undefined && base ? (price / base - 1) * 100 : q?.change_pct
+  const status = live.status ?? (q?.source === 'oanda' ? 'live' : 'delayed')
   return (
     <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-panel px-3 py-2">
       <div className="flex items-center gap-2 font-bold tracking-tight"><span className="text-accent">◆</span> ShreeAgent AI</div>
       <Search />
       <Watchlist />
       <div className="num flex items-baseline gap-2">
-        <span className="text-lg font-semibold">{q ? fmtPrice(q.price, dec) : '…'}</span>
-        {q && <span className={q.change_pct >= 0 ? 'text-up' : 'text-down'}>{q.change_pct >= 0 ? '▲' : '▼'} {fmtPct(q.change_pct)}</span>}
+        <span className={`text-lg font-semibold ${status === 'stale' ? 'text-muted line-through' : ''}`} data-testid="top-price">
+          {price !== undefined ? fmtPrice(price, dec) : '…'}
+        </span>
+        {chg !== undefined && <span className={chg >= 0 ? 'text-up' : 'text-down'}>{chg >= 0 ? '▲' : '▼'} {fmtPct(chg)}</span>}
+        {live.price?.spread_pips != null && <span className="text-xs text-muted" title="Current spread">spread {live.price.spread_pips.toFixed(1)} pips</span>}
       </div>
       <span className="text-xs text-muted">{sessionLabel(now)}</span>
       <div className="ml-auto flex items-center gap-3">
-        <StatusDot priceSource={q?.source ?? ''} />
+        <StatusDot status={status} source={live.price?.source ?? q?.source ?? ''} />
         <button onClick={toggleTheme} title="Switch light / dark" className="rounded-md border border-line px-2 py-1 text-sm">
           {theme === 'dark' ? '☀' : '🌙'}
         </button>

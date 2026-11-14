@@ -19,6 +19,7 @@ from api.bus import get_bus
 from api.jobs import JobRunner
 from api.routers import app_routes, market, research, signals
 from config.logging_setup import setup_logging
+from data.stream.live import set_live
 
 log = logging.getLogger(__name__)
 STARTED = time.time()
@@ -50,7 +51,27 @@ def warm_up() -> None:
         log.warning("Warm-up failed: %s", e)
 
 
-def create_app() -> FastAPI:
+def start_live(bus):
+    """Start live prices for the watchlist (more symbols are added when a chart subscribes)."""
+    from config.settings import get_settings
+    from data.stream.live import LiveService
+
+    if not get_settings().live_enabled:
+        return None
+    try:
+        from data.watchlist import Watchlist
+
+        svc = LiveService(bus)
+        set_live(svc)
+        threading.Thread(target=svc.start, args=(Watchlist().symbols(),), name="live-start", daemon=True).start()
+        return svc
+    except Exception as e:
+        log.warning("Live prices disabled: %s", e)
+        return None
+
+
+def create_app(background: bool = True) -> FastAPI:
+    """background=False (tests): no warm-up and no live price threads."""
     setup_logging()
 
     @asynccontextmanager
@@ -60,10 +81,16 @@ def create_app() -> FastAPI:
         # Every finished job is announced on the bus, so the UI can refetch without polling.
         jobs.on_done.append(lambda j: bus.publish("job", j.public(with_result=False)))
         app.state.jobs = jobs
-        threading.Thread(target=warm_up, name="warm-up", daemon=True).start()
+        live = None
+        if background:
+            threading.Thread(target=warm_up, name="warm-up", daemon=True).start()
+            live = start_live(bus)
         log.info("API started")
         yield
         jobs.shutdown()
+        if live:
+            live.stop()
+            set_live(None)
 
     app = FastAPI(title="ShreeAgent AI", version="2.0.0", lifespan=lifespan,
                   description="Analysis only. No orders are ever placed.")

@@ -51,15 +51,45 @@ def get_candles(symbol: str, tf: str = "1d", limit: int = Query(500, ge=10, le=5
 
     older = df if before is None else df[df.index < pd.Timestamp(before, unit="s", tz="UTC")]
     bars = to_candles(older, limit)
-    return {"symbol": sym.ticker, "tf": tf, "source": df.attrs.get("source", ""), "candles": bars,
-            "has_more": len(older) > limit}
+    live = _live_state(sym.ticker)
+    if before is None and live is not None:
+        # The live feed's current candle is newer than the (cached) history: put it on the end.
+        cur = live.agg.current(tf)
+        if cur and bars and cur["time"] >= bars[-1]["time"]:
+            bars = [b for b in bars if b["time"] != cur["time"]] + [clean(cur)]
+    return {"symbol": sym.ticker, "tf": tf, "source": (live.source if live and live.source == "oanda" else None)
+            or df.attrs.get("source", ""), "candles": bars, "has_more": len(older) > limit,
+            "live_status": live.status if live else None}
+
+
+def _live_state(ticker: str):
+    from data.stream.live import get_live
+
+    live = get_live()
+    return live.states.get(ticker) if live else None
+
+
+@router.get("/live/status")
+def live_status():
+    from data.stream.live import get_live
+
+    live = get_live()
+    return clean(live.status() if live else {"feeds": {}, "symbols": {}, "oanda_configured": False})
 
 
 @router.get("/quote")
 def quote(symbol: str, data=Depends(get_data)):
     sym = symbol_or_404(symbol)
     try:
-        return clean(data.last_price(sym))
+        q = clean(data.last_price(sym))
+        st = _live_state(sym.ticker)
+        if st is not None and st.mid is not None and st.status in ("live", "delayed"):
+            # Same % base (previous day close) with the live price.
+            base = q["price"] / (1 + q["change_pct"] / 100) if q.get("change_pct") is not None else None
+            q.update({"price": st.mid, "bid": st.bid, "ask": st.ask, "spread_pips": st.spread_pips,
+                      "source": "oanda" if st.source == "oanda" else q["source"], "live_status": st.status,
+                      "change_pct": (st.mid / base - 1) * 100 if base else q["change_pct"]})
+        return q
     except Exception as e:
         raise HTTPException(502, f"Price data unavailable: {e}") from e
 
