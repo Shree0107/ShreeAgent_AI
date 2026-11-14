@@ -23,6 +23,8 @@ small samples by phase 7). lookup() picks the most specific bucket matching `con
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import json
 import logging
 from pathlib import Path
@@ -30,6 +32,18 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 MIN_N = 30
 CONTEXT_KEYS = ("session", "market", "direction")
+# phase 7: the backtest replays the engine "as if no backtest existed yet" (results must not feed themselves)
+_IGNORE = contextvars.ContextVar("intraday_probability_ignore", default=False)
+
+
+@contextlib.contextmanager
+def ignore_results():
+    """Inside this block lookup() finds nothing and every setup counts as enabled (used by the backtest)."""
+    tok = _IGNORE.set(True)
+    try:
+        yield
+    finally:
+        _IGNORE.reset(tok)
 
 
 def backtest_dir() -> Path:
@@ -43,6 +57,8 @@ def result_path(symbol: str, setup: str, base: Path | None = None) -> Path:
 
 
 def _load(symbol: str, setup: str, base: Path | None) -> dict | None:
+    if _IGNORE.get():
+        return None
     p = result_path(symbol, setup, base)
     if not p.exists():
         return None

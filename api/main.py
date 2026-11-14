@@ -21,6 +21,7 @@ from api.routers import app_routes, drawings, market, research, signals
 from api.routers import forecast_tab  # phase 9
 from api.routers import fundamentals_tab  # phase 8: Fundamentals tab (/api/fund/*)
 from api.routers import plans  # Intraday (phase 6)
+from api.routers import performance  # phase 7: Performance tab (/api/performance/*)
 from config.logging_setup import setup_logging
 from data.stream.live import set_live
 
@@ -132,7 +133,7 @@ def create_app(background: bool = True) -> FastAPI:
         return {"ok": True, "uptime_s": round(time.time() - STARTED, 1)}
 
     for r in (market.router, signals.router, research.router, app_routes.router, drawings.router, plans.router,
-              fundamentals_tab.router, forecast_tab.router, ws.router):
+              fundamentals_tab.router, forecast_tab.router, performance.router, ws.router):  # phase 7: performance
         app.include_router(r)
     return app
 

@@ -17,6 +17,7 @@ const ComingSoon = lazy(() => import('./tabs/ComingSoon'))
 const ForecastTab = lazy(() => import('./tabs/ForecastTab')) // phase 9
 const FundamentalsTab = lazy(() => import('./tabs/FundamentalsTab')) // phase 8
 const TradePlanTab = lazy(() => import('./tabs/TradePlanTab')) // phase 6
+const PerformanceTab = lazy(() => import('./tabs/PerformanceTab')) // phase 7
 
 export default function App() {
   const { tab, setTab } = useApp()
@@ -38,7 +39,7 @@ export default function App() {
       <main className="min-h-0 flex-1 overflow-auto">
         {tab === 'chart' ? <ChartTab /> : (
           <Suspense fallback={<div className="p-6 text-muted">Loading…</div>}>
-            {tab === 'plan' ? <TradePlanTab /> : tab === 'forecast' ? <ForecastTab /> : tab === 'fundamentals' ? <FundamentalsTab /> : <ComingSoon tab={tab} />}
+            {tab === 'plan' ? <TradePlanTab /> : tab === 'forecast' ? <ForecastTab /> : tab === 'fundamentals' ? <FundamentalsTab /> : tab === 'performance' ? <PerformanceTab /> /* phase 7 */ : <ComingSoon tab={tab} />}
           </Suspense>
         )}
       </main>

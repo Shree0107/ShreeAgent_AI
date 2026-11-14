@@ -130,6 +130,19 @@ class Settings(BaseSettings):
     intraday_plan_expiry_bars: int = 8       # a plan not entered within N 15-minute candles expires
     intraday_refresh_delay_s: int = 20       # re-run this long after each 15-minute close (data arrives)
 
+    # ---- Backtests (phase 7) ----
+    backtest_commission_pips: float = 0.0    # broker commission per round trip, in pips (XTB Standard: 0, cost is in the spread)
+    backtest_slippage_pips: float = 0.2      # extra cost on stop orders and stop-loss exits (price moves while filling)
+    backtest_train_months: int = 12          # walk-forward: tune on this many months ...
+    backtest_test_months: int = 3            # ... then test on the next N months (only these results are reported)
+    backtest_grid_min_confirmations: str = "3,4"   # "tuning" choices tried on each training window
+    backtest_grid_min_rr: str = "1.5,2.0"
+    backtest_min_trades: int = 50            # fewer test trades than this -> the setup is switched off
+    backtest_min_profit_factor: float = 1.15 # lower -> switched off
+    backtest_significance: float = 0.05      # win rate must beat break-even with this binomial p-value
+    backtest_prior_trades: int = 20          # shrinkage strength (pseudo-trades of the average) for small samples
+    backtest_months: int = 24                # default history length for the backtest script / Run button
+
     log_level: str = "INFO"
 
     @property
