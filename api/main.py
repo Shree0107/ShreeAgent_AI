@@ -18,6 +18,7 @@ from api import ws
 from api.bus import get_bus
 from api.jobs import JobRunner
 from api.routers import app_routes, drawings, market, research, signals
+from api.routers import forecast_tab  # phase 9
 from config.logging_setup import setup_logging
 from data.stream.live import set_live
 
@@ -85,8 +86,18 @@ def create_app(background: bool = True) -> FastAPI:
         if background:
             threading.Thread(target=warm_up, name="warm-up", daemon=True).start()
             live = start_live(bus)
+        # phase 9: keep viewed forecasts fresh (re-run at each candle close)
+        fc_sched = None
+        if background:
+            from forecasting.live import start_scheduler
+
+            fc_sched = start_scheduler(app, bus)
         log.info("API started")
         yield
+        if fc_sched:  # phase 9
+            from forecasting.live import stop_scheduler
+
+            stop_scheduler(fc_sched, bus)
         jobs.shutdown()
         if live:
             live.stop()
@@ -102,7 +113,7 @@ def create_app(background: bool = True) -> FastAPI:
     def health():
         return {"ok": True, "uptime_s": round(time.time() - STARTED, 1)}
 
-    for r in (market.router, signals.router, research.router, app_routes.router, drawings.router, ws.router):
+    for r in (market.router, signals.router, research.router, app_routes.router, drawings.router, forecast_tab.router, ws.router):
         app.include_router(r)
     return app
 
