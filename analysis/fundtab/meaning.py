@@ -21,8 +21,9 @@ EVENT_RULES: list[tuple[str, str, int, str]] = [
     ("core_inflation", r"core (cpi|pce|ppi|inflation)|trimmed mean|median cpi", 1, "core inflation"),
     ("housing", r"housing|home sales|building permits|building approvals|house price|\bhpi\b|mortgage", 1, "housing"),
     ("inflation", r"\bcpi\b|hicp|inflation|\bpce\b|price index|\bppi\b|\brpi\b|prices", 1, "inflation"),
+    # Jobs before unemployment: "Non-Farm Payrolls / Unemployment" is mainly the payrolls number.
+    ("jobs", r"non-farm|nonfarm|payrolls|employment change|\badp\b|jolts|job openings", 1, "job growth"),
     ("unemployment", r"unemployment|claimant count|jobless|claims", -1, "unemployment"),
-    ("jobs", r"non-farm|nonfarm|payrolls|employment change|\badp\b|jolts|job openings|employment", 1, "job growth"),
     ("wages", r"earnings|wage|labor cost|labour cost", 1, "wage growth"),
     ("growth", r"\bgdp\b|economic growth", 1, "economic growth"),
     ("spending", r"retail sales|spending|consumption", 1, "shopping (retail sales)"),

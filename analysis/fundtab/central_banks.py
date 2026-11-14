@@ -108,7 +108,7 @@ def central_banks(data, calendar_events: list | None = None, now: datetime | Non
                   currencies=CURRENCIES) -> dict:
     now = now or datetime.now(timezone.utc)
     cfg = macro_config()
-    rows, missing_any = [], False
+    rows, missing_any, have_any = [], False, False
     for c in currencies:
         if c not in cfg:
             continue
@@ -123,19 +123,28 @@ def central_banks(data, calendar_events: list | None = None, now: datetime | Non
         exp = expectation(cm.rate_change_6m, cm.inflation_yoy, cm.inflation_target, y2, cm.policy_rate)
         if cm.policy_rate is None:
             missing_any = True
+        else:
+            have_any = True
+        stale = bool(rate_date) and (now.date() - datetime.fromisoformat(rate_date).date()).days > 90
         nm = _next_meeting(c, now.date(), calendar_events)
         rows.append({
             "currency": c, "currency_name": cur_name(c), "bank": cm.central_bank, "short": BANK_SHORT.get(c, c),
-            "policy_rate": cm.policy_rate, "rate_as_of": rate_date, "rate_change_6m": cm.rate_change_6m,
+            "policy_rate": cm.policy_rate, "rate_as_of": rate_date, "rate_stale": stale,
+            "rate_change_6m": cm.rate_change_6m,
             "inflation_yoy": cm.inflation_yoy, "inflation_target": cm.inflation_target,
             "yield_2y": y2, "yield_2y_as_of": y2_date,
             "next_meeting": nm, "next_meeting_text": nm["date"] if nm else "date not in calendar file",
             "expectation": exp, "missing": cm.missing,
         })
     notes = []
-    if missing_any:
-        notes.append("Some interest rates are unavailable. They come from FRED: set FRED_API_KEY in .env "
+    if missing_any and not have_any:
+        notes.append("Interest rates are unavailable. They come from FRED: set FRED_API_KEY in .env "
                      "(free at fred.stlouisfed.org).")
+    elif missing_any:
+        notes.append("Some interest rates are unavailable from FRED (the series may have stopped updating; the IDs "
+                     "are in config/macro_series.yaml). Their estimate uses the other facts only.")
+    if any(r.get("rate_stale") for r in rows):
+        notes.append("Rates marked 'old data' are more than 3 months old in FRED and may no longer be current.")
     notes.append("Rates come from FRED. Some countries' rates are monthly figures that can lag by a month or "
                  "more: check the 'as of' date.")
     return {"banks": rows, "tooltip": TOOLTIP, "notes": notes, "source": "FRED + config/events.yaml"}

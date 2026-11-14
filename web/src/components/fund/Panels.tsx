@@ -55,7 +55,7 @@ export function CentralBanks() {
                     <td className="py-1 pr-2"><span className="font-semibold">{b.short ?? b.currency}</span> <span className="text-muted">{b.currency}</span></td>
                     <td className="pr-2 font-mono">
                       {b.policy_rate != null ? `${b.policy_rate.toFixed(2)}%` : <span className="text-muted" title={b.error ?? 'Needs FRED_API_KEY'}>n/a</span>}
-                      {b.rate_as_of && <div className="text-[10px] text-muted">as of {b.rate_as_of}</div>}
+                      {b.rate_as_of && <div className="text-[10px] text-muted">as of {b.rate_as_of}{b.rate_stale && <span className="text-wait"> · old data</span>}</div>}
                     </td>
                     <td className="pr-2">{b.next_meeting ? b.next_meeting.date : <span className="text-muted">{b.next_meeting_text ?? 'date not in calendar file'}</span>}</td>
                     <td>

@@ -52,6 +52,7 @@ export interface Bank {
   short?: string
   policy_rate?: number | null
   rate_as_of?: string | null
+  rate_stale?: boolean
   rate_change_6m?: number | null
   inflation_yoy?: number | null
   inflation_target?: number | null

@@ -10,7 +10,7 @@ import pandas as pd
 
 from analysis.fundtab import symbol_currencies
 from analysis.fundtab.meaning import classify, meaning, plain_title, surprise
-from data.providers.calendar import CalendarEvent, fetch_ff, get_calendar, next_major
+from data.providers.calendar import CalendarEvent, fallback_events, fetch_ff, get_calendar, next_major
 
 log = logging.getLogger(__name__)
 
@@ -116,6 +116,19 @@ def calendar_view(symbol=None, currencies: list[str] | None = None, impacts: lis
     focus = sym_cur or (currencies or [])
     nxt = next_major(events, focus, now) if focus else next((e for e in events if e.major and e.time > now
                                                              and e.impact != "holiday"), None)
+    if feed_ok:
+        covered = max(e.time for e in events if e.source == "forexfactory")
+        if hi > covered + timedelta(days=1):
+            notes.append("ForexFactory has not published next week's list yet: events after "
+                         f"{covered.date().isoformat()} are missing for now.")
+    if nxt is None and feed_ok:
+        # Beyond the feed: the next known release / central-bank meeting (FRED + events.yaml), approximate time.
+        try:
+            later = [e for e in fallback_events(data, focus or ["USD", "EUR", "GBP", "JPY"], 30)
+                     if e.major and e.time > now and (not focus or e.currency in focus)]
+            nxt = min(later, key=lambda e: e.time) if later else None
+        except Exception as ex:
+            log.info("No fallback next event: %s", ex)
     cur = {c.upper() for c in currencies} if currencies else None
     fred_errors: list[str] = []
     rows = []

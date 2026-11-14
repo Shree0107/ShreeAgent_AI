@@ -46,7 +46,7 @@ export function NextEventBanner({ data, loading, error, symbol, onReached }: {
       <span className="text-xs uppercase tracking-wide text-muted">Next big event</span>
       {loading ? <span className="text-sm text-muted">Loading…</span>
         : error ? <span className="text-sm text-down">Calendar unavailable</span>
-        : !ev ? <span className="text-sm text-muted">No big event for {symbol} in the next 2 weeks of the calendar.</span>
+        : !ev ? <span className="text-sm text-muted">No big event for {symbol} in the calendar data available right now.</span>
         : (
           <>
             <span className="text-sm font-semibold">{ev.currency} · {ev.plain_title}</span>

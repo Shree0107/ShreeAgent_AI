@@ -48,6 +48,8 @@ def test_classify_event_types():
     assert classify("Core CPI m/m").type == "core_inflation"
     assert classify("Unemployment Rate").direction == -1
     assert classify("Non-Farm Employment Change").type == "jobs"
+    assert classify("US Non-Farm Payrolls / Unemployment").type == "jobs"
+    assert classify("Unemployment Claims").type == "unemployment"
     assert classify("FOMC Member Waller Speaks").type == "speech"
     assert classify("Federal Funds Rate").type == "rate"
     assert classify("Bank Holiday", "holiday").type == "holiday"
@@ -323,3 +325,16 @@ def test_api_section_failure_is_isolated(client):
     s = c.get("/api/fund/strength").json()  # all pairs missing: still a valid, empty meter
     assert len(s["missing_pairs"]) == 28 and all(r["strength"] is None for r in s["currencies"])
     assert c.get("/api/fund/calendar").status_code == 200
+
+
+def test_next_event_beyond_feed_uses_fallback_and_notes_missing_week():
+    from data.providers.base import EconomicEvent
+
+    class Later(FakeData):
+        def upcoming_events(self, currencies, days=14):
+            return [EconomicEvent(datetime(2026, 12, 9, tzinfo=timezone.utc), "USD", "FOMC rate decision", "high", "events.yaml")]
+
+    sat = datetime(2026, 11, 14, 12, tzinfo=timezone.utc)  # feed's events all in the past, next week not published
+    v = calendar_view(EURUSD, None, None, "week", "UTC", data=Later(), ff_fetch=ff, now=sat)
+    assert v["next_major"]["title"] == "FOMC rate decision" and v["next_major"]["time_exact"] is False
+    assert any("not published next week's list" in n for n in v["notes"])

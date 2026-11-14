@@ -64,6 +64,9 @@ def summarise(symbol_ticker: str, headlines: list[str], provider=None, cache=Non
     hit = cache.get(key)
     if hit is not None:
         return {"enabled": True, "summaries": guard_summaries(headlines, hit), "note": "", "cached": True}
+    err = cache.get(key + ":err")
+    if err is not None:
+        return {"enabled": True, "summaries": [None] * len(headlines), "note": err}
     try:
         from config.settings import get_settings
 
@@ -81,7 +84,15 @@ def summarise(symbol_ticker: str, headlines: list[str], provider=None, cache=Non
         return {"enabled": True, "summaries": out, "note": note, "cached": False}
     except Exception as e:
         log.info("News summaries skipped: %s", e)
-        return {"enabled": True, "summaries": [None] * len(headlines), "note": f"AI summaries unavailable right now ({e})."}
+        reason = str(e)
+        if "credit balance" in reason.lower():
+            reason = "the AI account has no credit left"
+        note = f"AI summaries unavailable right now ({reason[:140]}). Headlines are shown as they are."
+        try:  # don't retry a failing LLM on every page load
+            cache.set(key + ":err", note, 600)
+        except Exception:
+            pass
+        return {"enabled": True, "summaries": [None] * len(headlines), "note": note}
 
 
 def news_feed(symbol, data, days: int = 7) -> dict:
