@@ -6,12 +6,22 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import type { Candle } from '../../lib/api'
 import { fmtPrice } from '../../lib/format'
 import * as I from '../../lib/indicators'
+import { hitTest, logicalToTime, type DPoint } from '../../lib/drawings'
+import { DrawingsPrimitive, type DrawState } from './DrawingsPrimitive'
 import type { ChartType, IndicatorId } from '../../lib/store'
 
 export interface PriceChartHandle {
   screenshot: () => HTMLCanvasElement | null
   chart: () => IChartApi | null
   mainSeries: () => ISeriesApi<SeriesType> | null
+  /** Id of the drawing at a pixel position, if any. */
+  hitDrawing: (x: number, y: number) => string | null
+}
+
+/** A click/hover on the price pane, in both chart terms (time, price) and pixels. */
+export interface ChartPoint extends DPoint {
+  x: number
+  y: number
 }
 
 interface Props {
@@ -22,7 +32,11 @@ interface Props {
   intraday: boolean
   hasVolume: boolean
   theme: string
+  barSeconds: number
   onNeedMore?: () => void
+  draw?: Pick<DrawState, 'drawings' | 'preview' | 'selected'>
+  onChartClick?: (p: ChartPoint) => void
+  onHover?: (p: ChartPoint | null) => void
 }
 
 function css(name: string): string {
@@ -44,7 +58,7 @@ const PCT = { type: 'price' as const, precision: 1, minMove: 0.1 }
 const PANE_ORDER: IndicatorId[] = ['volume', 'rsi', 'macd', 'stoch', 'atr']
 
 export const PriceChart = forwardRef<PriceChartHandle, Props>(function PriceChart(
-  { candles, chartType, indicators, decimals, intraday, hasVolume, theme, onNeedMore }, ref,
+  { candles, chartType, indicators, decimals, intraday, hasVolume, theme, barSeconds, onNeedMore, draw, onChartClick, onHover }, ref,
 ) {
   const box = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -52,6 +66,9 @@ export const PriceChart = forwardRef<PriceChartHandle, Props>(function PriceChar
   const seriesRef = useRef<Record<string, ISeriesApi<SeriesType>>>({})
   const needMoreRef = useRef(onNeedMore)
   needMoreRef.current = onNeedMore
+  const prim = useRef(new DrawingsPrimitive())
+  const cb = useRef({ onChartClick, onHover, candles, barSeconds })
+  cb.current = { onChartClick, onHover, candles, barSeconds }
   const [legend, setLegend] = useState<Candle | null>(null)
 
   const panes = useMemo(
@@ -64,11 +81,13 @@ export const PriceChart = forwardRef<PriceChartHandle, Props>(function PriceChar
     screenshot: () => chartRef.current?.takeScreenshot(true) ?? null,
     chart: () => chartRef.current,
     mainSeries: () => mainRef.current,
+    hitDrawing: (x, y) => hitTest(prim.current.state.drawings, { x, y }, prim.current.toXY, prim.current.paneWidth()),
   }))
 
   // (Re)build the chart when its structure changes.
   useEffect(() => {
     if (!box.current) return
+    const el = box.current
     const chart = createChart(box.current, {
       autoSize: true,
       layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: css('--muted'), fontSize: 12,
@@ -129,8 +148,43 @@ export const PriceChart = forwardRef<PriceChartHandle, Props>(function PriceChar
     chart.panes().forEach((pn, i) => pn.setStretchFactor(i === 0 ? 3 : 1))
     mainRef.current = s.main
     seriesRef.current = s
+    s.main.attachPrimitive(prim.current)
+    prim.current.setState({ colors: { line: css('--accent'), selected: css('--wait'), text: css('--muted'),
+                                      fill: 'rgba(59,130,246,0.12)' } })
+
+    // Pixel -> (time, price) on the price pane; time is extrapolated past the last candle.
+    const toPoint = (param: MouseEventParams<Time>): ChartPoint | null => {
+      if (!param.point || param.logical === undefined || (param.paneIndex ?? 0) !== 0) return null
+      const price = s.main.coordinateToPrice(param.point.y)
+      if (price === null) return null
+      const times = cb.current.candles.map((b) => b.time)
+      return { x: param.point.x, y: param.point.y, price, time: Math.round(logicalToTime(param.logical, times, cb.current.barSeconds)) }
+    }
+    // Clicks are read from pointer events directly: the chart's own click event drops a second click that
+    // follows within ~300 ms (double-click detection), which loses points when placing drawings quickly.
+    let press: { x: number; y: number } | null = null
+    const onDown = (e: PointerEvent) => {
+      press = { x: e.clientX, y: e.clientY }
+    }
+    const onUp = (e: PointerEvent) => {
+      if (!press || Math.hypot(e.clientX - press.x, e.clientY - press.y) > 5) return   // a drag/pan, not a click
+      press = null
+      const r = el.getBoundingClientRect()
+      const x = e.clientX - r.left
+      const y = e.clientY - r.top
+      const pane0 = chart.panes()[0]
+      if (x < 0 || x > chart.timeScale().width() || y < 0 || y > pane0.getHeight()) return  // not on the price pane
+      const logical = chart.timeScale().coordinateToLogical(x)
+      const price = s.main.coordinateToPrice(y)
+      if (logical === null || price === null) return
+      const times = cb.current.candles.map((b) => b.time)
+      cb.current.onChartClick?.({ x, y, price, time: Math.round(logicalToTime(logical, times, cb.current.barSeconds)) })
+    }
+    el.addEventListener('pointerdown', onDown)
+    el.addEventListener('pointerup', onUp)
 
     const onMove = (param: MouseEventParams<Time>) => {
+      cb.current.onHover?.(toPoint(param))
       const d = param.seriesData.get(s.main) as { open?: number; high?: number; low?: number; close?: number; value?: number } | undefined
       if (!d || param.time === undefined) return setLegend(null)
       const close = d.close ?? d.value ?? 0
@@ -143,6 +197,9 @@ export const PriceChart = forwardRef<PriceChartHandle, Props>(function PriceChar
     chart.timeScale().subscribeVisibleLogicalRangeChange(onRange)
     return () => {
       chart.unsubscribeCrosshairMove(onMove)
+      el.removeEventListener('pointerdown', onDown)
+      el.removeEventListener('pointerup', onUp)
+      s.main.detachPrimitive(prim.current)
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange)
       chart.remove()
       chartRef.current = null
@@ -190,6 +247,11 @@ export const PriceChart = forwardRef<PriceChartHandle, Props>(function PriceChar
     }
     if (s.atr) s.atr.setData(line(candles, I.atr(candles)))
   }, [candles, config, chartType, intraday])
+
+  useEffect(() => {
+    prim.current.setState({ times: candles.map((b) => b.time), barSeconds,
+                            drawings: draw?.drawings ?? [], preview: draw?.preview ?? null, selected: draw?.selected ?? null })
+  }, [candles, barSeconds, draw?.drawings, draw?.preview, draw?.selected, config])
 
   const shown = legend ?? candles[candles.length - 1] ?? null
   const chg = shown ? ((shown.close - shown.open) / shown.open) * 100 : 0

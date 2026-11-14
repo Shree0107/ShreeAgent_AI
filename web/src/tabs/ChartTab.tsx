@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { PriceChart, type PriceChartHandle } from '../components/chart/PriceChart'
 import { api } from '../lib/api'
 import { decimalsFor } from '../lib/format'
@@ -9,6 +9,8 @@ import { fmtCountdown } from '../lib/format'
 import { secondsToCandleClose } from '../lib/sessions'
 import { useCandles } from '../lib/useCandles'
 import { useNow } from '../components/TopBar'
+import { useDrawings } from '../components/chart/useDrawings'
+import { TOOLS } from '../lib/drawings'
 
 const TYPES: { id: ChartType; label: string }[] = [
   { id: 'candles', label: 'Candles' },
@@ -57,6 +59,11 @@ export function ChartTab() {
   }, [menu])
   const decimals = info?.decimals ?? decimalsFor(symbol, candles.at(-1)?.close)
   const tfSec = TIMEFRAMES.find((x) => x.id === tf)?.seconds ?? 3600
+  const dr = useDrawings(symbol)
+  const [drawMenu, setDrawMenu] = useState(false)
+  const toolInfo = TOOLS.find((t) => t.type === dr.tool)
+  const drawState = useMemo(() => ({ drawings: dr.drawings, preview: dr.preview, selected: dr.selected }),
+                            [dr.drawings, dr.preview, dr.selected])
 
   const screenshot = () => {
     const canvas = chart.current?.screenshot()
@@ -93,6 +100,22 @@ export function ChartTab() {
             </div>
           )}
         </div>
+        <div className="relative">
+          <button onClick={() => setDrawMenu((m) => !m)} aria-expanded={drawMenu}
+            className={`rounded-md border px-2.5 py-1 text-xs font-medium ${dr.tool ? 'border-accent text-accent' : 'border-line text-muted hover:text-fg'}`}>
+            ✏ {toolInfo ? toolInfo.label : 'Draw'}
+          </button>
+          {drawMenu && (
+            <div className="absolute left-0 top-8 z-30 w-52 rounded-md border border-line bg-panel p-1 shadow-xl" role="menu">
+              {TOOLS.map((t) => (
+                <button key={t.type} role="menuitem" onClick={() => { dr.startTool(t.type); setDrawMenu(false) }}
+                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-panel-2">
+                  <span className="w-5 text-center text-muted">{t.icon}</span>{t.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button onClick={screenshot} title="Download a PNG of the chart"
           className="rounded-md border border-line px-2.5 py-1 text-xs font-medium text-muted hover:text-fg">📷 Screenshot</button>
         <span className="ml-auto text-xs text-muted">
@@ -101,12 +124,45 @@ export function ChartTab() {
           {' · next candle in '}<span className="num">{fmtCountdown(secondsToCandleClose(tfSec, now.getTime() / 1000))}</span>
         </span>
       </div>
-      <div className="relative min-h-[420px] flex-1 overflow-hidden rounded-lg border border-line bg-panel">
-        {error ? (
-          <div className="p-6 text-down">Couldn't load prices for {symbol}: {error}</div>
-        ) : (
-          <PriceChart ref={chart} candles={candles} chartType={chartType} indicators={indicators} decimals={decimals}
-            intraday={tfSec < 86400} hasVolume={info?.has_volume ?? !symbol.includes('/')} theme={theme} onNeedMore={loadMore} />
+      <div className="flex min-h-0 flex-1 flex-col gap-2 md:flex-row">
+        <div className={`relative min-h-[420px] flex-1 overflow-hidden rounded-lg border bg-panel ${dr.tool ? 'border-accent cursor-crosshair' : 'border-line'}`}>
+          {toolInfo && (
+            <div className="absolute left-1/2 top-2 z-20 -translate-x-1/2 rounded-md bg-accent px-3 py-1 text-xs font-medium text-white shadow" role="status">
+              {toolInfo.label}: {toolInfo.help} ({dr.pending.length}/{toolInfo.points}) · Esc to cancel
+            </div>
+          )}
+          {error ? (
+            <div className="p-6 text-down">Couldn't load prices for {symbol}: {error}</div>
+          ) : (
+            <PriceChart ref={chart} candles={candles} chartType={chartType} indicators={indicators} decimals={decimals}
+              intraday={tfSec < 86400} hasVolume={info?.has_volume ?? !symbol.includes('/')} theme={theme} barSeconds={tfSec}
+              onNeedMore={loadMore} draw={drawState} onHover={dr.setHover}
+              onChartClick={(p) => {
+                if (dr.addPoint(p)) return
+                dr.setSelected(chart.current?.hitDrawing(p.x, p.y) ?? null)
+              }} />
+          )}
+        </div>
+        {(dr.drawings.length > 0 || dr.error) && (
+          <aside className="w-full shrink-0 rounded-lg border border-line bg-panel p-2 text-sm md:w-56" aria-label="My drawings">
+            <div className="mb-1 flex items-center justify-between">
+              <b className="text-xs uppercase tracking-wide text-muted">My drawings ({dr.drawings.length})</b>
+              {dr.drawings.length > 0 && <button className="text-xs text-muted hover:text-down" onClick={dr.clearAll}>Clear all</button>}
+            </div>
+            {dr.error && <div className="mb-1 text-xs text-down">{dr.error}</div>}
+            <ul className="space-y-0.5">
+              {dr.drawings.map((d) => (
+                <li key={d.id} className={`flex items-center gap-1 rounded px-1 ${d.id === dr.selected ? 'bg-panel-2' : ''}`}>
+                  <button className="flex-1 truncate py-1 text-left" onClick={() => dr.setSelected(d.id)}>
+                    {TOOLS.find((t) => t.type === d.type)?.icon} {d.type === 'text' ? d.text : TOOLS.find((t) => t.type === d.type)?.label}
+                    {d.type === 'hline' && <span className="num text-muted"> {d.points[0].price.toFixed(decimals)}</span>}
+                  </button>
+                  <button title="Delete" aria-label={`Delete ${d.type}`} className="px-1 text-muted hover:text-down" onClick={() => dr.remove(d.id)}>✕</button>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[11px] text-muted">Click a drawing to select it, Delete to remove. Saved automatically for {symbol}.</p>
+          </aside>
         )}
       </div>
     </div>

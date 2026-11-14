@@ -58,3 +58,39 @@ test('live status arrives over the WebSocket and intraday timeframes load', asyn
   await expect(page.getByText(/next candle in \d+:\d\d/)).toBeVisible()
   await page.screenshot({ path: `test-results/chart-${info.project.name}-15m.png` })
 })
+
+test('draw lines on the chart; they are saved and come back after a reload', async ({ page, request }, info) => {
+  test.skip(info.project.name === 'mobile', 'drawing with a mouse is a desktop flow')
+  const API = 'http://127.0.0.1:8000/api/drawings?symbol=USD%2FCHF'
+  const before = await (await request.get(API)).json()           // the user's own drawings: restored at the end
+  await request.put(API, { data: [] })
+  try {
+    await page.addInitScript(() => localStorage.setItem('sa-ui', JSON.stringify({ symbol: 'USD/CHF', tf: '1d' })))
+    await page.goto('/')
+    await expect(page.getByText(/^O\s/).first()).toBeVisible()
+    const box = (await page.getByTestId('price-chart').boundingBox())!
+    const at = (fx: number, fy: number) => ({ x: box.x + box.width * fx, y: box.y + box.height * fy })
+
+    await page.getByRole('button', { name: /Draw/ }).click()
+    await page.getByRole('menuitem', { name: 'Horizontal line' }).click()
+    await expect(page.getByRole('status')).toContainText('Horizontal line')
+    await page.mouse.click(at(0.5, 0.3).x, at(0.5, 0.3).y)
+
+    await page.getByRole('button', { name: /Draw/ }).click()
+    await page.getByRole('menuitem', { name: 'Trendline' }).click()
+    await page.mouse.click(at(0.3, 0.5).x, at(0.3, 0.5).y)
+    await page.mouse.move(at(0.6, 0.4).x, at(0.6, 0.4).y)
+    await page.mouse.click(at(0.7, 0.35).x, at(0.7, 0.35).y)
+
+    const panel = page.getByRole('complementary', { name: 'My drawings' })
+    await expect(panel).toContainText('My drawings (2)')
+    await page.screenshot({ path: `test-results/drawings-${info.project.name}.png` })
+    await page.waitForTimeout(800)                                  // auto-save is debounced
+    await page.reload()
+    await expect(page.getByRole('complementary', { name: 'My drawings' })).toContainText('My drawings (2)')
+    const saved = await (await request.get(API)).json()
+    expect(saved.map((d: { type: string }) => d.type).sort()).toEqual(['hline', 'trendline'])
+  } finally {
+    await request.put(API, { data: before })
+  }
+})

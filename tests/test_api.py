@@ -163,3 +163,18 @@ def test_websocket_sends_status_snapshot_on_connect(client):
             assert snap["topic"] == "status" and "EUR/USD" in snap["data"]["symbols"]
     finally:
         set_live(None)
+
+
+def test_drawings_saved_per_symbol(client, tmp_path):
+    from api.routers.drawings import DrawingStore, get_store
+
+    store = DrawingStore(tmp_path / "d.sqlite")
+    client.app.dependency_overrides[get_store] = lambda: store
+    d = [{"id": "a1", "type": "trendline", "points": [{"time": 1, "price": 1.1}, {"time": 2, "price": 1.2}]},
+         {"id": "t1", "type": "text", "points": [{"time": 3, "price": 1.15}], "text": "watch this"}]
+    assert client.put("/api/drawings", params={"symbol": "EUR/USD"}, json=d).status_code == 200
+    got = client.get("/api/drawings", params={"symbol": "EUR/USD"}).json()
+    assert [x["id"] for x in got] == ["a1", "t1"] and got[1]["text"] == "watch this"
+    assert client.get("/api/drawings", params={"symbol": "GBP/USD"}).json() == []
+    bad = [{"id": "x", "type": "spiral", "points": [{"time": 1, "price": 1}]}]
+    assert client.put("/api/drawings", params={"symbol": "EUR/USD"}, json=bad).status_code == 422
