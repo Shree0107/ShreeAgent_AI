@@ -124,3 +124,20 @@ def test_api_lifespan_turns_plan_events_into_alerts(monkeypatch):
                 if msg.get("topic") == "alert":
                     break
     assert msg["topic"] == "alert" and msg["data"]["title"].startswith("🚀 Entry triggered")
+
+
+def test_intraday_engine_event_shape_is_alerted(monkeypatch):
+    """intraday/service.py publishes {"kind": ..., "target": 1|2, ...}, not {"type": ...}."""
+    monkeypatch.setenv("ALERT_EVENTS", "get_ready,entry_triggered,tp_hit,sl_hit,cancelled")
+    from config.settings import get_settings
+
+    get_settings.cache_clear()
+    bus, snd = RecBus(), RecSender()
+    d = AlertDispatcher(bus, senders=[snd])
+    get_settings.cache_clear()
+    ev = {k: v for k, v in EV.items() if k != "type"}
+    assert d.handle({**ev, "kind": "entry_triggered", "plan_id": "k1"})
+    assert d.handle({**ev, "kind": "tp_hit", "target": 2, "plan_id": "k1"})
+    assert [m["type"] for _, m in bus.msgs] == ["entry_triggered", "tp2_hit"]
+    assert bus.msgs[1][1]["title"].startswith("✅ Target 2 hit")
+    assert not d.handle({**ev, "kind": "breakeven_set", "plan_id": "k1"})  # off by default (follows "breakeven")

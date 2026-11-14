@@ -20,6 +20,7 @@ from api.jobs import JobRunner
 from api.routers import app_routes, drawings, market, research, signals
 from api.routers import forecast_tab  # phase 9
 from api.routers import fundamentals_tab  # phase 8: Fundamentals tab (/api/fund/*)
+from api.routers import plans  # Intraday (phase 6)
 from config.logging_setup import setup_logging
 from data.stream.live import set_live
 
@@ -85,6 +86,7 @@ def create_app(background: bool = True) -> FastAPI:
         app.state.jobs = jobs
         live = None
         alerts = None
+        intraday = None
         if background:
             threading.Thread(target=warm_up, name="warm-up", daemon=True).start()
             live = start_live(bus)
@@ -95,6 +97,9 @@ def create_app(background: bool = True) -> FastAPI:
                 alerts.start()
             except Exception as e:
                 log.warning("Trade-plan alerts disabled: %s", e)
+            from intraday.scheduler import start as start_intraday  # Intraday (phase 6)
+
+            intraday = start_intraday(app, bus)
         # phase 9: keep viewed forecasts fresh (re-run at each candle close)
         fc_sched = None
         if background:
@@ -103,6 +108,8 @@ def create_app(background: bool = True) -> FastAPI:
             fc_sched = start_scheduler(app, bus)
         log.info("API started")
         yield
+        if intraday:
+            intraday.stop()
         if alerts:
             alerts.stop()
         if fc_sched:  # phase 9
@@ -124,7 +131,7 @@ def create_app(background: bool = True) -> FastAPI:
     def health():
         return {"ok": True, "uptime_s": round(time.time() - STARTED, 1)}
 
-    for r in (market.router, signals.router, research.router, app_routes.router, drawings.router,
+    for r in (market.router, signals.router, research.router, app_routes.router, drawings.router, plans.router,
               fundamentals_tab.router, forecast_tab.router, ws.router):
         app.include_router(r)
     return app

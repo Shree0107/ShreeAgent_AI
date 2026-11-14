@@ -25,6 +25,7 @@ EVENT_TITLES = {
     "tp1_hit": "✅ Target 1 hit",
     "tp2_hit": "✅ Target 2 hit",
     "sl_hit": "❌ Stop loss hit",
+    "breakeven_set": "🛡 Stop moved to entry",
     "breakeven": "➖ Closed at break-even",
     "time_stop": "⏱ Time stop: close the trade",
     "cancelled": "🚫 Setup cancelled",
@@ -33,9 +34,17 @@ EVENT_TITLES = {
 DISCLAIMER = "Analysis only, not financial advice. Always use a stop loss."
 
 
+def event_kind(ev: dict) -> str:
+    """The intraday engine names the event `kind`; older producers use `type`. tp_hit + target 1/2 -> tp1_hit/tp2_hit."""
+    kind = str(ev.get("type") or ev.get("kind") or "")
+    if kind == "tp_hit" and ev.get("target") in (1, 2, "1", "2"):
+        kind = f"tp{ev['target']}_hit"
+    return kind
+
+
 def format_alert(ev: dict) -> tuple[str, str]:
     """(title, body) in plain words. Numbers are taken from the event as-is."""
-    kind = str(ev.get("type", ""))
+    kind = event_kind(ev)
     title = f"{EVENT_TITLES.get(kind, '🔔 Update')}: {ev.get('symbol', '')}"
     lines = [ev.get("message") or kind.replace("_", " ").capitalize()]
     for k, label in (("entry", "Entry"), ("stop", "Stop loss"), ("target1", "Target 1"), ("target2", "Target 2")):
@@ -68,12 +77,12 @@ class AlertDispatcher:
         self._task: asyncio.Task | None = None
 
     def wants(self, kind: str) -> bool:
-        base = "tp_hit" if kind in ("tp1_hit", "tp2_hit") else kind
+        base = {"tp1_hit": "tp_hit", "tp2_hit": "tp_hit", "breakeven_set": "breakeven"}.get(kind, kind)
         return "all" in self.enabled or kind in self.enabled or base in self.enabled
 
     def handle(self, ev: dict) -> bool:
         """Returns True if the alert was dispatched (not filtered or a duplicate)."""
-        kind = str(ev.get("type", ""))
+        kind = event_kind(ev)
         if not self.wants(kind):
             return False
         key = (ev.get("plan_id") or ev.get("symbol"), kind, ev.get("setup"))

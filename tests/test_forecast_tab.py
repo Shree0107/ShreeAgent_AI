@@ -349,6 +349,8 @@ def test_agreement_endpoint_uses_plans_when_available(client):
     def plans(symbols: str):
         return {"cards": [{"symbol": "EUR/USD", "action": "BUY", "direction": "long", "entry": 1.1, "stop": 1.09}]}
 
+    # the real /api/plans route (phase 6) is registered first: put the stub in front so it wins
+    client.app.router.routes.insert(0, client.app.router.routes.pop())
     r = client.get("/api/forecast/agreement", params={"symbol": "EUR/USD", "tf": "1h"}).json()
     assert r["status"] == "disagree" and r["plan"]["source"] == "intraday"
     assert r["text"] == "The forecast points down while the plan says BUY – be careful."
