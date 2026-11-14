@@ -102,3 +102,25 @@ def test_telegram_sender_posts_and_splits_long_messages():
     assert t.send("x" * 5000)
     assert len(calls) == 2 and calls[0][0].endswith("/botT0K/sendMessage") and calls[0][1]["chat_id"] == "42"
     assert not TelegramNotifier(token="", chat_id="", session=Http()).send("hi")
+
+
+def test_api_lifespan_turns_plan_events_into_alerts(monkeypatch):
+    """With background=True the API starts the dispatcher: a plan_event on the bus becomes an `alert`."""
+    import api.main as main
+    from api.bus import get_bus
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(main, "warm_up", lambda: None)
+    monkeypatch.setattr(main, "start_live", lambda bus: None)
+    monkeypatch.setattr("alerts.telegram.TelegramNotifier.configured", property(lambda self: False))
+    with TestClient(main.create_app(background=True)) as c:
+        with c.websocket_connect("/ws") as ws:
+            assert ws.receive_json()["topic"] == "hello"
+            ws.send_json({"op": "subscribe", "topics": ["alert"]})
+            ws.receive_json()  # subscription acknowledged
+            get_bus().publish("plan_event", {**EV, "plan_id": "lifespan-test"})
+            for _ in range(5):
+                msg = ws.receive_json()
+                if msg.get("topic") == "alert":
+                    break
+    assert msg["topic"] == "alert" and msg["data"]["title"].startswith("🚀 Entry triggered")

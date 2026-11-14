@@ -82,11 +82,21 @@ def create_app(background: bool = True) -> FastAPI:
         jobs.on_done.append(lambda j: bus.publish("job", j.public(with_result=False)))
         app.state.jobs = jobs
         live = None
+        alerts = None
         if background:
             threading.Thread(target=warm_up, name="warm-up", daemon=True).start()
             live = start_live(bus)
+            try:  # trade-plan events -> Telegram / desktop notifications / WhatsApp
+                from alerts.dispatcher import AlertDispatcher
+
+                alerts = AlertDispatcher(bus)
+                alerts.start()
+            except Exception as e:
+                log.warning("Trade-plan alerts disabled: %s", e)
         log.info("API started")
         yield
+        if alerts:
+            alerts.stop()
         jobs.shutdown()
         if live:
             live.stop()
