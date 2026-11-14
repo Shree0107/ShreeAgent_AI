@@ -6,6 +6,7 @@
 # Find or verify series at https://fred.stlouisfed.org (search the name and copy the ID).
 # If FRED discontinues a series, the app shows "n/a" for it. Replace the ID here.
 # inflation_target: central bank target (percent), used for the hawkish/dovish lean.
+# yield_2y (optional): 2-year government bond yield, used by the Fundamentals tab's rate-expectation estimate.
 
 USD:
   name: United States
@@ -15,6 +16,7 @@ USD:
   bond_10y: DGS10
   gdp: GDPC1
   inflation_target: 2.0
+  yield_2y: DGS2
 EUR:
   name: Euro Area
   central_bank: ECB

@@ -19,6 +19,7 @@ from api.bus import get_bus
 from api.jobs import JobRunner
 from api.routers import app_routes, drawings, market, research, signals
 from api.routers import forecast_tab  # phase 9
+from api.routers import fundamentals_tab  # phase 8: Fundamentals tab (/api/fund/*)
 from config.logging_setup import setup_logging
 from data.stream.live import set_live
 
@@ -123,7 +124,8 @@ def create_app(background: bool = True) -> FastAPI:
     def health():
         return {"ok": True, "uptime_s": round(time.time() - STARTED, 1)}
 
-    for r in (market.router, signals.router, research.router, app_routes.router, drawings.router, forecast_tab.router, ws.router):
+    for r in (market.router, signals.router, research.router, app_routes.router, drawings.router,
+              fundamentals_tab.router, forecast_tab.router, ws.router):
         app.include_router(r)
     return app
 
