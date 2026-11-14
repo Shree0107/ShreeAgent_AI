@@ -98,6 +98,22 @@ class Settings(BaseSettings):
     fx_lot_size: int = 100_000              # units of the base currency in 1 standard lot
     fx_min_lot: float = 0.01
 
+    # ---- Intraday (phase 6) ----
+    intraday_timeframe: str = "15m"          # main trading chart (setups, entry, stop, targets)
+    intraday_min_rr: float = 1.5             # BUY/SELL only if reward/risk to target 1 >= this
+    intraday_min_confirmations: int = 3      # independent checks that must agree
+    news_blackout_minutes: int = 30          # no new signals this long before and after high-impact news
+    session_timezone: str = "Europe/Berlin"  # time zone of the two cut-off times below (XTB / CET)
+    no_new_entries_after: str = "18:00"      # no new trades after this local time
+    flat_by: str = "21:30"                   # every trade closed by this local time (time stop)
+    breakeven_at_r: float = 1.0              # move the stop to the entry once the trade is up this many R
+    max_spread_pips: str = "EUR/USD:2.0,GBP/USD:2.5,USD/JPY:2.0,XAU/USD:50,default:3.0"
+    typical_spread_pips: str = "EUR/USD:1.0,GBP/USD:1.5,USD/JPY:1.2,XAU/USD:30,default:2.0"
+    intraday_setups_enabled: str = "trend_pullback,squeeze_breakout,range_breakout,asian_range_breakout,bos_retest"
+    daily_loss_limit: int = 2                # stop suggesting new trades after this many losses in a day
+    intraday_plan_expiry_bars: int = 8       # a plan not entered within N 15-minute candles expires
+    intraday_refresh_delay_s: int = 20       # re-run this long after each 15-minute close (data arrives)
+
     log_level: str = "INFO"
 
     @property

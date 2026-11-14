@@ -18,6 +18,7 @@ from api import ws
 from api.bus import get_bus
 from api.jobs import JobRunner
 from api.routers import app_routes, drawings, market, research, signals
+from api.routers import plans  # Intraday (phase 6)
 from config.logging_setup import setup_logging
 from data.stream.live import set_live
 
@@ -82,11 +83,17 @@ def create_app(background: bool = True) -> FastAPI:
         jobs.on_done.append(lambda j: bus.publish("job", j.public(with_result=False)))
         app.state.jobs = jobs
         live = None
+        intraday = None
         if background:
             threading.Thread(target=warm_up, name="warm-up", daemon=True).start()
             live = start_live(bus)
+            from intraday.scheduler import start as start_intraday  # Intraday (phase 6)
+
+            intraday = start_intraday(app, bus)
         log.info("API started")
         yield
+        if intraday:
+            intraday.stop()
         jobs.shutdown()
         if live:
             live.stop()
@@ -102,7 +109,7 @@ def create_app(background: bool = True) -> FastAPI:
     def health():
         return {"ok": True, "uptime_s": round(time.time() - STARTED, 1)}
 
-    for r in (market.router, signals.router, research.router, app_routes.router, drawings.router, ws.router):
+    for r in (market.router, signals.router, research.router, app_routes.router, drawings.router, plans.router, ws.router):
         app.include_router(r)
     return app
 
