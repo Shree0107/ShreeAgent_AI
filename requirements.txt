@@ -17,3 +17,8 @@ reportlab==5.1.0
 APScheduler==3.11.3
 transformers==5.22.2
 pytest==9.2.0
+# ---- API backend (FastAPI + WebSockets) ----
+fastapi==0.162.7
+uvicorn==0.54.0
+websockets==17.4
+httpx==0.28.1
