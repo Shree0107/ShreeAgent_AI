@@ -183,6 +183,8 @@ def plain_lines(rows: list[dict], files: dict[str, dict], symbol: str, period: s
                 f"(last {period}, {tag}); on average {r['expectancy_pips']:+.1f} pips per trade after costs.")
         if f and not f.get("enabled", True):
             line += " Switched off for the live cards: " + f.get("disabled_reason", "")
+        elif f and f.get("unproven"):
+            line += " Still on, but unproven: " + f.get("unproven_reason", "")
         out.append(line)
     return out
 

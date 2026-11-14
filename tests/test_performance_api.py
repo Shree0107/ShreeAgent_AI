@@ -80,7 +80,9 @@ def test_run_job_then_summary_equity_and_live_comparison(client):
     s = client.get("/api/performance/summary?symbol=EUR/USD").json()
     assert s["has_backtest"] and s["runs"][0]["method"] == "single_split"
     assert any(r["session"] == "all" and r["setup"] == "trend_pullback" for r in s["rows"])
-    assert s["lines"][0].startswith("Pullback in the trend") and s["disabled"][0]["reason"]
+    # a short single-split run doesn't switch setups off: they stay on, labelled unproven
+    assert s["lines"][0].startswith("Pullback in the trend") and s["disabled"] == []
+    assert any("Still on, but unproven" in ln for ln in s["lines"])
     e = client.get("/api/performance/equity?symbol=EUR/USD").json()
     assert e["backtest"]["EUR/USD"] and e["live"] == []
     for i, (o, p) in enumerate([("tp1_hit", 10), ("sl_hit", -10), ("tp2_hit", 30)]):

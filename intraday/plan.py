@@ -227,7 +227,7 @@ def _scenarios(ctx: Context, rng: dict | None, m) -> list[dict]:
 
 
 def _confidence(n_conf: int, rr: float, prob: dict | None, cfg) -> str:
-    wr = (prob or {}).get("win_rate")
+    wr = None if (prob or {}).get("unproven") else (prob or {}).get("win_rate")
     if n_conf >= cfg.min_confirmations + 2 and rr >= 2 and (wr is None or wr >= 0.55):
         return "High"
     if n_conf >= cfg.min_confirmations and (wr is None or wr >= 0.45):
@@ -238,7 +238,8 @@ def _confidence(n_conf: int, rr: float, prob: dict | None, cfg) -> str:
 def _prob_text(prob: dict | None) -> str:
     if not prob:
         return "No backtest yet – treat as unproven"
-    return f"~{prob['win_rate'] * 100:.0f}% reached target 1 first ({prob['n']} similar past setups)"
+    text = f"~{prob['win_rate'] * 100:.0f}% reached target 1 first ({prob['n']} similar past setups)"
+    return text + " – too few tests to trust yet" if prob.get("unproven") else text
 
 
 # ------------------------------------------------------------------ the card

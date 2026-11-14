@@ -209,8 +209,11 @@ def test_probability_json_round_trip_with_lookup(tmp_path):
     ny = probability.lookup("trend_pullback", "EUR/USD", {"session": "new_york"}, base=tmp_path)
     assert ny["bucket"] == "overall"                            # 25 trades < MIN_N -> overall
     assert probability.setup_enabled("trend_pullback", "EUR/USD", base=tmp_path)
-    assert not probability.setup_enabled("bos_retest", "EUR/USD", base=tmp_path)
-    assert "0 test trades" in probability.disabled_reason("bos_retest", "EUR/USD", base=tmp_path)
+    # too few test trades: still on, labelled unproven (missing evidence is not evidence of failure)
+    assert probability.setup_enabled("bos_retest", "EUR/USD", base=tmp_path)
+    assert probability.disabled_reason("bos_retest", "EUR/USD", base=tmp_path) == ""
+    assert files["bos_retest"]["unproven"] and "0 test trades" in files["bos_retest"]["unproven_reason"]
+    assert files["trend_pullback"]["unproven"] is False
     with probability.ignore_results():
         assert probability.lookup("trend_pullback", "EUR/USD", {}, base=tmp_path) is None
         assert probability.setup_enabled("bos_retest", "EUR/USD", base=tmp_path)
@@ -252,7 +255,7 @@ def test_run_backtest_writes_files_and_run_summary(tmp_path, monkeypatch):
     assert all(datetime.fromisoformat(t["created_at"]) >= datetime.fromisoformat(r["windows"][0]["test_start"])
                for t in r["trades"])                                      # only out-of-sample trades reported
     f = json.loads(probability.result_path("EUR/USD", "trend_pullback", tmp_path).read_text(encoding="utf-8"))
-    assert f["method"] == "single_split" and f["enabled"] is False and f["disabled_reason"]
+    assert f["method"] == "single_split" and f["enabled"] is True and f["unproven"] and f["unproven_reason"]
     assert walkforward.load_run("EUR/USD", tmp_path)["symbol"] == "EUR/USD"
     assert "done" in calls and "simulate" in calls
 
@@ -308,3 +311,22 @@ def test_future_tampering_does_not_change_earlier_decisions(engine_run):
         bad.loc[later, k] = bad.loc[later, k] * 1.02           # a 2% jump right after the cut
     tampered = decisions(EU, Frames(frames_from(bad)), cfg, W0, CUT)
     assert [_key(d) for d in tampered] == [_key(d) for d in decs if d.t <= CUT]
+
+
+def test_large_losing_sample_is_switched_off_and_small_one_is_only_unproven(tmp_path):
+    bad = [_t(-10, False, day=i % 28) for i in range(60)] + [_t(8, True, day=i % 28) for i in range(20)]
+    f = result_files("EUR/USD", ["trend_pullback"], bad, Rules(), {"out_of_sample": True, "method": "walk_forward"})
+    assert f["trend_pullback"]["enabled"] is False and "profit factor" in f["trend_pullback"]["disabled_reason"]
+    small = result_files("EUR/USD", ["trend_pullback"], bad[:12], Rules(), {"out_of_sample": True})
+    assert small["trend_pullback"]["enabled"] is True and small["trend_pullback"]["unproven"]
+    write_files(small, tmp_path)
+    prob = probability.lookup("trend_pullback", "EUR/USD", {}, base=tmp_path)
+    assert prob["unproven"]
+
+    from intraday.config import IntradayConfig
+    from intraday.plan import _confidence, _prob_text
+
+    assert _prob_text(prob).endswith("too few tests to trust yet")
+    cfg = IntradayConfig()
+    # a shaky 12-trade win rate doesn't drag the confidence down
+    assert _confidence(cfg.min_confirmations, 1.6, prob, cfg) == _confidence(cfg.min_confirmations, 1.6, None, cfg)

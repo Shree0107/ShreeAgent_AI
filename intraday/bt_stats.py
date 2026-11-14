@@ -190,6 +190,15 @@ def result_files(symbol: str, setups: list[str], trades: list, rules: Rules, met
         ts = [t for t in trades if _get(t, "setup") == s]
         st = stats(ts)
         ok, why = verdict(st, rules)
+        # Too few test trades is missing evidence, not evidence that the setup fails: keep it on, labelled
+        # "unproven" (otherwise a short Yahoo history would switch every setup off). Only a large enough sample
+        # with a poor result switches a setup off.
+        unproven = len(ts) < rules.min_trades
+        if unproven:
+            ok, note = True, why
+            why = ""
+        else:
+            note = ""
         k = st["wins"]
         overall = {"n": len(ts), "win_rate": round(shrink(k, len(ts), pooled, rules.prior_trades), 4),
                    "raw_win_rate": st["win_rate"], "profit_factor": st["profit_factor"],
@@ -197,6 +206,7 @@ def result_files(symbol: str, setups: list[str], trades: list, rules: Rules, met
                    "p25_minutes_to_tp1": st["p25_minutes_to_tp1"], "p75_minutes_to_tp1": st["p75_minutes_to_tp1"]}
         setup_avg = k / len(ts) if ts else pooled
         out[s] = {"symbol": symbol, "setup": s, "generated_at": now, **meta, "enabled": ok, "disabled_reason": why,
+                  "unproven": unproven, "unproven_reason": note,
                   "overall": overall, "stats": st, "buckets": buckets(ts, setup_avg, rules.prior_trades) if ts else {}}
     return out
 

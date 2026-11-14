@@ -91,7 +91,8 @@ def lookup(setup_type: str, symbol: str, context: dict, base: Path | None = None
     if not best or not best.get("n"):
         return None
     return {**best, "bucket": best_key, "generated_at": res.get("generated_at"),
-            "out_of_sample": res.get("out_of_sample", True), "period": res.get("period")}
+            "out_of_sample": res.get("out_of_sample", True), "period": res.get("period"),
+            "unproven": bool(res.get("unproven")) or not res.get("out_of_sample", True)}
 
 
 def _combos(keys: list[str], r: int):
