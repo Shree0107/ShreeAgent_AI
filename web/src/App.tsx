@@ -14,6 +14,7 @@ const TABS: { id: Tab; label: string }[] = [
 ]
 
 const ComingSoon = lazy(() => import('./tabs/ComingSoon'))
+const ForecastTab = lazy(() => import('./tabs/ForecastTab')) // phase 9
 
 export default function App() {
   const { tab, setTab } = useApp()
@@ -35,7 +36,7 @@ export default function App() {
       <main className="min-h-0 flex-1 overflow-auto">
         {tab === 'chart' ? <ChartTab /> : (
           <Suspense fallback={<div className="p-6 text-muted">Loading…</div>}>
-            <ComingSoon tab={tab} />
+            {tab === 'forecast' ? <ForecastTab /> : <ComingSoon tab={tab} />}
           </Suspense>
         )}
       </main>
