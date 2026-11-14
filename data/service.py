@@ -86,14 +86,27 @@ class DataService:
             return None
 
     def last_price(self, symbol: Symbol) -> dict:
+        """Latest price and % change vs the previous day's close.
+
+        The price comes from the freshest bars available (hourly when possible): Yahoo's daily forex bar can lag
+        the intraday data, which would show a different price in the header than on the chart.
+        """
         df = self.get_ohlcv(symbol, "1d")
-        last, prev = df["close"].iloc[-1], df["close"].iloc[-2] if len(df) > 1 else df["close"].iloc[-1]
+        last_t, last = df.index[-1], float(df["close"].iloc[-1])
+        source = df.attrs.get("source", "")
+        try:
+            h = self.get_ohlcv(symbol, "1h")
+            if len(h) and h.index[-1] >= last_t:
+                last_t, last, source = h.index[-1], float(h["close"].iloc[-1]), h.attrs.get("source", source)
+        except Exception as e:  # hourly data unavailable: the daily close is still a valid price
+            log.info("Hourly quote for %s unavailable: %s", symbol.ticker, e)
+        prev = float(df["close"].iloc[-2]) if len(df) > 1 else last
         return {
             "symbol": symbol.ticker,
-            "price": float(last),
-            "change_pct": float((last / prev - 1) * 100),
-            "as_of": df.index[-1].isoformat(),
-            "source": df.attrs.get("source", ""),
+            "price": last,
+            "change_pct": (last / prev - 1) * 100 if prev else 0.0,
+            "as_of": last_t.isoformat(),
+            "source": source,
             "investing_url": symbol.investing_url,
         }
 

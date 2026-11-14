@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* Theme tokens. Dark is the default; [data-theme="light"] switches everything, including chart colours
+   (the chart reads these variables at runtime). */
+:root,
+:root[data-theme="dark"] {
+  --bg: #0f1218;
+  --panel: #161a22;
+  --panel-2: #1c212b;
+  --border: #2a303c;
+  --text: #e6e9ef;
+  --muted: #8b93a3;
+  --accent: #3b82f6;
+  --up: #22c55e;
+  --down: #ef4444;
+  --wait: #f59e0b;
+  --ready: #38bdf8;
+  --grid: rgba(139, 147, 163, 0.12);
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --panel-2: #f0f2f5;
+  --border: #d9dde4;
+  --text: #151922;
+  --muted: #5d6573;
+  --accent: #2563eb;
+  --up: #15803d;
+  --down: #dc2626;
+  --wait: #b45309;
+  --ready: #0284c7;
+  --grid: rgba(93, 101, 115, 0.14);
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-line: var(--border);
+  --color-fg: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-wait: var(--wait);
+  --color-ready: var(--ready);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

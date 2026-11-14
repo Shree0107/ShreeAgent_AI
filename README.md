@@ -36,6 +36,16 @@ streamlit run ui/app.py
 ```
 Or with Docker: `docker compose up -d --build` and open http://localhost:8501.
 
+### New web platform (in progress)
+A faster, TradingView-style web app is being built in phases (FastAPI backend + React frontend). To try it:
+```bash
+python -m server                 # backend on http://127.0.0.1:8000  (API docs at /docs)
+cd web && npm install && npm run dev   # frontend on http://localhost:5173
+```
+Done so far: top bar (search, watchlist, price, session, connection status, light/dark), Chart tab
+(timeframes, candles/line/Heikin Ashi, indicators, crosshair, zoom/scroll, screenshot), Ask AI drawer.
+The classic dashboard (`streamlit run ui/app.py`) keeps working while the new tabs are built.
+
 **Full step-by-step instructions (API keys, model download, alerts, troubleshooting): [SETUP.md](SETUP.md).**
 
 ## Project layout
@@ -48,7 +58,9 @@ signals/      beginner BUY/SELL/WAIT engine: structure, levels, decision gates, 
               templates, locked-number LLM polish, SQLite history + outcome tracking
 agent/        LLM providers (Claude, OpenAI-compatible), tools, prompt, agent loop, report export
 alerts/       WhatsApp notifiers, watchlist scanner, scheduler
-ui/           Streamlit dashboard + Plotly charts
+api/          FastAPI backend: REST + WebSocket hub, background jobs, event bus (python -m server)
+web/          React + TypeScript frontend (Vite, Lightweight Charts, Tailwind); tests: npm test, npx playwright test
+ui/           classic Streamlit dashboard + Plotly charts
 scripts/      download_model.py, run_backtest.py
 tests/        offline unit tests (pytest)
 ```
@@ -58,6 +70,7 @@ tests/        offline unit tests (pytest)
 python -m pytest
 ```
 All tests run offline: market APIs, the LLM and the forecaster are replaced with fakes.
+Frontend: `cd web && npm test` (unit/component) and `npx playwright test` (browser smoke tests, starts both servers).
 
 ## Licences
 Code: your own. **TimesFM-3 weights** are under Google's *TimesFM Non-Commercial License v1.0*, for personal,

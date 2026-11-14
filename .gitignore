@@ -29,3 +29,8 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Frontend
+node_modules/
+web/test-results/
+web/playwright-report/

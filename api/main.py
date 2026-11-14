@@ -6,6 +6,7 @@ The React app (web/) talks to /api/* and /ws. In development Vite proxies them; 
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from contextlib import asynccontextmanager
 
@@ -23,6 +24,32 @@ log = logging.getLogger(__name__)
 STARTED = time.time()
 
 
+def warm_up() -> None:
+    """Background: import the heavy modules and pre-load watchlist prices, so the first page load after a
+    restart is as fast as later ones (cold imports of yfinance/pandas paths cost ~1 s per first request)."""
+    t0 = time.time()
+    try:
+        from data.service import get_data_service
+        from data.watchlist import Watchlist
+        from signals import service as _signals  # noqa: F401  (imports the analysis engine)
+
+        data = get_data_service()
+        for tk in Watchlist().symbols():
+            from data.symbols import parse_symbol
+
+            sym = parse_symbol(tk)
+            if not sym:
+                continue
+            for tf in ("1h", "1d"):
+                try:
+                    data.get_ohlcv(sym, tf)
+                except Exception as e:  # offline or bad ticker: the page will show the error itself
+                    log.info("Warm-up %s %s skipped: %s", tk, tf, e)
+        log.info("Warm-up done in %.1f s", time.time() - t0)
+    except Exception as e:
+        log.warning("Warm-up failed: %s", e)
+
+
 def create_app() -> FastAPI:
     setup_logging()
 
@@ -33,6 +60,7 @@ def create_app() -> FastAPI:
         # Every finished job is announced on the bus, so the UI can refetch without polling.
         jobs.on_done.append(lambda j: bus.publish("job", j.public(with_result=False)))
         app.state.jobs = jobs
+        threading.Thread(target=warm_up, name="warm-up", daemon=True).start()
         log.info("API started")
         yield
         jobs.shutdown()
