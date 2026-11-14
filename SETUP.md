@@ -1,250 +1,47 @@
 # ShreeAgent AI: Setup Guide
 
-These are the steps you do yourself. Follow them in order. Commands are for **Windows (PowerShell)**. Linux/macOS
-equivalents are shown where they differ.
+ShreeAgent AI is a trading-analysis platform that runs in your browser. It has a live chart, beginner trade plans,
+fundamentals, forecasts and backtests. Commands are for **Windows (PowerShell)**. Linux/macOS commands are shown
+where they differ.
 
-> ShreeAgent AI only analyses. It never places trades. Nothing it shows is financial advice.
+> ShreeAgent AI only analyses. It never places trades. Nothing it shows is financial advice. Always use a stop loss.
 
-**Already installed ShreeAgent AI before?** Go straight to
-[Part A: the new Signals section](#part-a-the-new-signals-section-upgrade-guide). **New install?** Do steps 1–10
-first, then read Part A from step A3 on.
-
----
-
-## Part A: the new Signals section (upgrade guide)
-
-The **🧭 Signals** tab now shows one simple card per watchlist symbol. Each card answers: *BUY, SELL or WAIT? Why?
-What am I waiting for? Where do I enter? Where's my stop loss? Where do I take profit? What would cancel the trade?*
-The technical analysis, fundamentals, news and the TimesFM-3 forecast all still run, but in the background.
-
-### A1. Pull the latest code and install
-
-```powershell
-cd C:\path\to\ShreeAgent_AI          # the folder you cloned into
-.venv\Scripts\activate
-git pull
-pip install -r requirements.txt      # no new packages this time, but this is always safe to run
-python -m pytest                     # should end with "109 passed"
-```
-With Docker: `git pull` then `docker compose up -d --build`.
-
-### A2. New settings for `.env` (all optional)
-
-**No new API keys are needed.** The new settings all have sensible defaults. Add only the ones you want to change.
-The easiest way is to copy the whole `# ---- Signals tab ----` and `# ---- Position size helper ----` blocks from
-`.env.example` to the end of your `.env`, then edit them. Most useful for an XTB EUR/USD trader:
-
-| Setting | Default | What it does |
-|---|---|---|
-| `ACCOUNT_SIZE` | `1000` | Your account size (the starting value of the position size helper) |
-| `ACCOUNT_CURRENCY` | `EUR` | Your XTB account currency |
-| `RISK_PER_TRADE_PCT` | `1.0` | % of the account you're willing to lose on one trade |
-| `SPREAD_PIPS` | `1.0` | Typical EUR/USD spread on your XTB account. It's added to the stop so the spread alone can't trigger it. Check it in xStation (the gap between the BUY and SELL price) |
-| `LEVERAGE` | `30` | Used only to show the margin needed. 1:30 is the EU retail maximum for major pairs |
-| `SIGNAL_MIN_RR` | `1.5` | BUY/SELL only when the possible gain is at least 1.5× the possible loss |
-| `SIGNAL_MIN_CONFIDENCE` | `Medium` | `High` = fewer but stronger signals, `Low` = more signals |
-
-`SIGNAL_LLM_POLISH=true` lets Claude reword the explanations (it uses your `ANTHROPIC_API_KEY`, a fraction of a cent
-per card). The numbers can't change: any rewrite that alters a number is thrown away automatically.
-
-Restart the app after editing `.env`.
-
-### A3. Run the app and open the Signals section
-
-```powershell
-.venv\Scripts\activate
-streamlit run ui/app.py
-```
-Open http://localhost:8501 and click the **🧭 Signals** tab.
-
-- **The very first start takes 1–3 minutes.** The app loads the news model (FinBERT, ~50 s) and the forecasting
-  model (TimesFM-3), then analyses each symbol. A spinner shows while it works.
-- After that, cards are stored in `user_data/signals.sqlite` and reused for 60 minutes
-  (`SIGNAL_REFRESH_MINUTES`), so the tab opens instantly. Click **🔄 Refresh signals** for a fresh analysis.
-- Your watchlist symbols get a card. So does the symbol currently open in the sidebar, marked *"Not in your
-  watchlist"* if it isn't in the list.
-- Use the **Show: All / Buy / Sell / Wait** filter at the top. Cards are sorted strongest first.
-
-### A4. How to read a signal card (example)
-
-```
-EUR/USD                                                1.1012
-                                                (+0.15% today)
- ███ BUY ███   Confidence: MEDIUM
-               the price trend and the forecast agree, but the news is mixed
-
-WHY?
- • The price has been rising steadily for about 3 weeks
- • The price bounced off 1.0970, a level where buyers have stepped in before
- • Our forecasting model expects the price to rise a little over the next 10 trading days
-
-WHEN SHOULD I ENTER?
- Buy between 1.0985 and 1.1012
- Only enter if a daily candle closes above 1.0985 – that shows buyers are defending the level at 1.0985
-
-STOP LOSS   1.09308 (68 pips below your entry)
- Below the recent low of 1.0948 (Tue 10 Nov) plus a small safety margin, so a normal dip won't knock you out
-
-TAKE PROFIT
- Target 1  1.11035  +0.95%  +€9.55     105 pips · just before 1.1110, where the price turned back before
- Target 2  1.11935  +1.77%  +€17.73    195 pips · just before 1.1200, where the price turned back before
-
-RISK vs REWARD  You risk €1 to potentially make €1.55 at target 1 (or €2.88 at target 2)
-POSITION SIZE   Buy 0.01 lots (1,000 units) – risk €6.16
-                Margin needed ≈ €33 · 1 pip ≈ €0.09 at this size
-
-WHAT WOULD CANCEL THIS TRADE?
- • If the price closes below 1.09308 before you enter, this idea is no longer valid – don't enter
- • If the price reaches 1.11035 before you enter, you've missed it – don't chase it
- • If you haven't entered by Wed 18 Nov 21:00 UTC, the signal has expired
-
-⚠️ Upcoming: The US inflation report is Thu 19 Nov – expect big price moves
-🕒 Generated Fri 13 Nov 09:12 UTC (5 min ago) · Expires Wed 18 Nov 21:00 UTC
-📊 Past signals for EUR/USD: 3 wins / 2 losses (60% win rate)
-This is analysis, not financial advice. Always use a stop loss.
-```
-*(Illustrative numbers for a €1,000 account risking 1%. Your card shows live prices. XTB shows EUR/USD with 5
-decimals, so the app does too when the 5th digit matters.)*
-
-How to use it on XTB (xStation):
-1. **BUY / SELL / WAIT.** Green BUY = consider buying, red SELL = consider selling, amber WAIT = do nothing yet.
-2. **Why?** The main facts behind the decision, in everyday words.
-3. **What am I waiting for?** (WAIT cards only.) The exact conditions to watch. Example: *"Wait for a daily close
-   above 1.1060"* means: wait until a daily candle *ends* above 1.1060 (the daily candle closes around 23:00 CET on
-   XTB), not just touches it. When the condition is met, click **Refresh signals** to see whether it has turned into
-   a BUY/SELL.
-4. **When should I enter?** Only open the trade while the price is inside the entry zone, and only after the
-   confirmation condition.
-5. **Stop loss.** Type this exact price into the *Stop loss* field of the XTB order ticket **before** you open the
-   trade.
-6. **Take profit.** Put target 1 in the *Take profit* field. A common beginner approach: close half at target 1 and
-   the rest at target 2, or simply use target 1.
-7. **What would cancel this trade?** If any of these happens before you enter, skip the trade.
-- **Confidence** shows how strongly the price trend, the economic background, the news and the forecast agree.
-- **Risk vs reward:** *"You risk €1 to potentially make €1.55"* means the possible gain is 1.55× the possible loss.
-- **Expires:** if you haven't entered by then, ignore the card and wait for a new one.
-- **Words with ⓘ:** hover with the mouse to see a one-line explanation. On a phone, tap
-  **📖 What do these words mean?** under the card.
-- **Show details:** opens the technical data behind the signal: score per component, the exact levels, indicators
-  per timeframe, support/resistance, the forecast, and (tick *Show charts*) a price chart with the entry zone, stop
-  and targets drawn on, plus the TimesFM forecast chart.
-
-**Why so many WAITs?** That's by design. The app says WAIT when the checks disagree, confidence is low, the possible
-gain is less than 1.5× the risk, a level sits right in front of the price, the stop would have to be very far away,
-or a major event (US inflation report, US jobs report, ECB / Fed decision) is today or tomorrow. Smaller releases
-(producer prices, retail sales, GDP, PCE) only show a warning.
-
-### A5. Position size helper
-
-At the top of the Signals tab:
-1. **Account size:** your XTB balance, e.g. `1000`.
-2. **Risk per trade (%):** how much of the account you accept losing if the stop is hit. 0.5–2% is typical for
-   beginners. 1% of €1,000 = €10.
-3. **Account currency:** `EUR` for a euro XTB account.
-
-Each BUY/SELL card then shows, for example (€1,000 at 1%, a 45-pip stop at 1.10),
-**"Buy 0.02 lots (2,000 units) – risk €8.18"**:
-- **Lots** is what you type into the *Volume* field in xStation. 1 lot = 100,000 EUR, 0.01 lots = 1,000 EUR,
-  which is the smallest trade.
-- The size is always **rounded down**, so the real risk is never more than you chose.
-- **Margin needed** is the money XTB sets aside while the trade is open (at 1:30). **1 pip ≈ …** shows what each
-  0.0001 move is worth at this size.
-- If your risk amount is too small even for 0.01 lots, the card says so and shows what 0.01 lots would risk. Then
-  either raise the risk %, or skip the trade.
-- The money figures on targets 1 and 2 use this size.
-
-The values reset when you restart the app. Set your usual values in `.env` (`ACCOUNT_SIZE`, `RISK_PER_TRADE_PCT`,
-`ACCOUNT_CURRENCY`) so they're filled in automatically.
-
-### A6. Changing settings (risk/reward, confidence, watchlist)
-
-Edit `.env`, save, and restart the app (`Ctrl+C`, then `streamlit run ui/app.py`). Then click **🔄 Refresh signals**,
-because stored cards keep their old settings until they're rebuilt.
-- **Minimum risk/reward:** `SIGNAL_MIN_RR=2.0` gives fewer but better-paying trades. `1.5` is the default.
-- **Confidence:** `SIGNAL_MIN_CONFIDENCE=High` gives only the strongest signals. `SIGNAL_MIN_SCORE` (default 25) is
-  how strong the combined score must be to suggest any direction. `SIGNAL_HIGH_SCORE` (default 50) is the score
-  needed for High confidence.
-- **Events:** `SIGNAL_EVENT_BLACKOUT_DAYS=1` = WAIT if a major event is today or tomorrow. `0` = only on the day
-  itself. `SIGNAL_EVENT_WARNING_DAYS=7` sets how far ahead warnings appear.
-- **Expiry:** `SIGNAL_EXPIRY_BARS=3` trading days.
-- **Watchlist:** add symbols with the sidebar search and **➕ Watchlist**, remove them with **✕**, or edit
-  `user_data/watchlist.yaml` (see step 7). For EUR/USD only, keep just `- EUR/USD` in that file.
-- Central-bank meeting dates come from `config/events.yaml`. Check them against the official calendars linked in
-  that file every few months.
-
-### A7. Signal history and win rate
-
-- Every **BUY/SELL** card is saved automatically (WAIT cards aren't trades, so they aren't counted). The same idea is
-  saved only once, even if you refresh many times.
-- Each time signals refresh (and on the daily WhatsApp scan), saved signals are checked against the hourly prices
-  that followed:
-  - **Hit target 1 / Hit target 2:** a win
-  - **Hit stop loss:** a loss. If the stop and the target were touched in the same hour, it counts as a loss (the
-    cautious choice).
-  - **Expired:** the price never came into the entry zone before the expiry
-  - **Missed:** it reached target 1 without entering first
-  - **Cancelled:** it closed beyond the stop before entering
-  - **Replaced:** a newer signal with different levels replaced it before entry
-- **Win rate = wins ÷ (wins + losses).** Expired, missed, cancelled and replaced signals aren't counted.
-- To see it: Signals tab → **📊 Signal history & win rate** (bottom of the page). It shows a table per symbol and
-  the full list, downloadable as CSV. Each card also shows its symbol's record (e.g. *"3 wins / 2 losses (60%)"*).
-- The results assume you entered inside the zone and used the exact stop and target. Your real XTB results differ
-  slightly because of spread and timing. A win rate means little until there are at least 20–30 results.
-- The data lives in `user_data/signals.sqlite`. Delete that file to start the history from scratch.
-
-### A8. Running the tests
-
-```powershell
-.venv\Scripts\activate
-python -m pytest                               # everything (offline, no API keys needed): 109 passed
-python -m pytest tests/test_signal_levels.py   # just the entry / stop / target maths
-python -m pytest -k signal -v                  # all signal tests, one line each
-```
-The signal tests cover the entry/stop/target calculation, every WAIT condition, the risk/reward threshold,
-position sizing (XTB lots, rounding down, accounts too small for 0.01 lots), events, the plain-language texts
-(no jargon), the AI-wording number lock, and the history/win-rate tracking.
-
-### A9. Troubleshooting the Signals tab
-
-| Problem | Fix |
+| # | Section |
 |---|---|
-| Signals tab spins for a long time | Normal on the very first start (1–3 min: models loading). If it's always slow, set `SIGNAL_INCLUDE_FORECAST=false` (no TimesFM) or `SENTIMENT_MODEL=lexicon` (no FinBERT). |
-| Every card says WAIT | Usually correct. Read *What am I waiting for?*. If you want more signals, lower `SIGNAL_MIN_CONFIDENCE` to `Low` or `SIGNAL_MIN_RR` to `1.2`, but more signals means weaker ones. |
-| "Wait until after the … report" all week | Check `config/events.yaml` dates, or set `SIGNAL_EVENT_BLACKOUT_DAYS=0`. |
-| Card shows "NO DATA" | The price download failed for that symbol. See the error text, check the ticker, wait a few minutes (Yahoo throttling), or add `TWELVEDATA_API_KEY`. |
-| "Wait for fresh prices – the latest data is from …" | Prices are more than 4 days old: internet or data-provider problem. Delete `.cache/cache.sqlite` and refresh. |
-| Settings changed but the cards didn't | Restart the app, then click **🔄 Refresh signals**. |
-| Position size says "too small" | Your risk amount can't cover 0.01 lots at this stop distance. Raise the risk % or skip the trade. Never move the stop closer just to fit the size. |
-| Money shows in USD with "no exchange rate found" | The currency conversion rate couldn't be downloaded. Try again later. Lots and prices are still correct. |
-| Prices differ slightly from XTB | Yahoo and XTB quote slightly different prices (different liquidity providers, plus the spread). Differences of 1–3 pips are normal. Always place the order with the prices XTB shows. |
-| History is empty | Only BUY/SELL signals are recorded. If you've only had WAITs, the history stays empty. |
-| AI wording doesn't change | `SIGNAL_LLM_POLISH=true` needs `ANTHROPIC_API_KEY`. A rewrite that changes any number is rejected and the template wording is kept (that's intended). |
+| 1 | [Install](#1-install) |
+| 2 | [OANDA demo account (live forex prices)](#2-oanda-demo-account-live-forex-prices) |
+| 3 | [Fill in `.env`](#3-fill-in-env) |
+| 4 | [Run it (Docker or without Docker)](#4-run-it) |
+| 5 | [Tour of the five tabs](#5-tour-of-the-five-tabs) |
+| 6 | [Reading a Trade Plan card (EUR/USD example)](#6-reading-a-trade-plan-card-eurusd-example) |
+| 7 | [Drawing tools and the AI analysis overlay](#7-drawing-tools-and-the-ai-analysis-overlay) |
+| 8 | [Alerts: Telegram, desktop, WhatsApp](#8-alerts-telegram-desktop-whatsapp) |
+| 9 | [Backtests and tests](#9-backtests-and-tests) |
+| 10 | [Troubleshooting](#10-troubleshooting) |
+
+The old Streamlit dashboard still works. Its guide is in [docs/legacy-streamlit.md](docs/legacy-streamlit.md).
 
 ---
 
-## 1. Prerequisites
+## 1. Install
 
+### What you need
 | Item | Version | Why | Get it |
 |---|---|---|---|
-| Python | **3.11 or newer** (tested on 3.11.5) | runs the app | https://www.python.org/downloads/ (tick **"Add python.exe to PATH"**) |
-| Git | any recent | clone/update the code | https://git-scm.com/downloads |
-| Docker Desktop | optional | run everything in containers | https://www.docker.com/products/docker-desktop/ |
-| Disk space | ~5 GB free | PyTorch (~1 GB), TimesFM-3 weights (~1.3 GB), FinBERT (~0.45 GB), Docker image | |
-| RAM | 8 GB minimum, 16 GB recommended | TimesFM-3 (330M parameters) runs in memory | |
-| NVIDIA GPU | optional | faster forecasts. CPU works fine (about 4 s per forecast after the first load) | driver from https://www.nvidia.com/Download/index.aspx |
+| Python | **3.11 or newer** | the backend | https://www.python.org/downloads/ (tick **"Add python.exe to PATH"**) |
+| Node.js | **22 LTS or newer** | builds and runs the web app (not needed with Docker) | https://nodejs.org |
+| Git | any recent | download and update the code | https://git-scm.com/downloads |
+| Docker Desktop | optional | one-command start | https://www.docker.com/products/docker-desktop/ |
+| Disk | ~6 GB free | PyTorch (~1 GB), TimesFM-3 (~1.3 GB), FinBERT (~0.45 GB), web packages | |
+| RAM | 8 GB minimum, 16 GB recommended | the forecasting model runs in memory | |
+| NVIDIA GPU | optional | faster forecasts. A CPU works (about 4 s per forecast once loaded) | |
 
 Check what you have:
 ```powershell
-python --version
-git --version
-docker --version      # only if you'll use Docker
-nvidia-smi            # only if you have an NVIDIA GPU
+python --version; node --version; git --version
 ```
 
----
-
-## 2. Clone and install
-
+### Download and install
 ```powershell
 git clone https://github.com/Shree0107/ShreeAgent_AI.git
 cd ShreeAgent_AI
@@ -252,271 +49,443 @@ cd ShreeAgent_AI
 python -m venv .venv
 .venv\Scripts\activate                 # Linux/macOS: source .venv/bin/activate
 python -m pip install --upgrade pip
-
-# Install PyTorch for your hardware FIRST
 pip install torch --index-url https://download.pytorch.org/whl/cpu        # CPU (default)
 # pip install torch --index-url https://download.pytorch.org/whl/cu128    # NVIDIA GPU instead
-
 pip install -r requirements.txt
+
+cd web
+npm install                            # web app packages (~1 min)
+cd ..
 ```
 
-Check the install with the test suite. It runs offline and needs no API keys:
-```powershell
-python -m pytest
-```
-You should see something like `109 passed`.
-
-> Each time you open a new terminal, run `.venv\Scripts\activate` again before using the app.
-
----
-
-## 3. Download TimesFM-3
-
-The model is **google/timesfm-3.0-pytorch** on Hugging Face: https://huggingface.co/google/timesfm-3.0-pytorch
-
+Download the forecasting model once (~1.3 GB; a test forecast at the end prints `TimesFM-3 is ready.`):
 ```powershell
 python scripts/download_model.py
 ```
-This downloads ~1.3 GB into your Hugging Face cache (`C:\Users\<you>\.cache\huggingface\hub`) and runs a test forecast.
-The first run takes a few minutes. It ends with `TimesFM-3 is ready.` and later loads take ~10 s.
+- No Hugging Face account is needed. If the download fails with `401` or `gated repo`, create a free **Read**
+  token at https://huggingface.co/settings/tokens and put it in `.env` as `HF_TOKEN=hf_...`.
+- **Licence:** the TimesFM-3 weights are under Google's *TimesFM Non-Commercial License*. Personal use is fine.
+  Don't sell its forecasts as a service.
+- The news model (FinBERT, ~440 MB) downloads by itself the first time news is analysed.
 
-- **Hugging Face account / token:** not needed. The model downloaded without login when this was set up. If the
-  download ever fails with `401` or `gated repo`:
-  1. Create a free account at https://huggingface.co/join.
-  2. Open the model page and accept the licence if asked.
-  3. Create a **Read** token at https://huggingface.co/settings/tokens.
-  4. Put it in `.env` as `HF_TOKEN=hf_...`.
-- **Licence:** the TimesFM *code* is Apache-2.0, but the **TimesFM-3 weights** are under Google's
-  **TimesFM Non-Commercial License v1.0**. That allows personal, non-commercial, non-production use, which
-  covers this personal assistant. Don't sell or offer forecasts from it as a service.
-- **Windows "symlinks" warning:** harmless, it only uses a little more disk space. To silence it, turn on Windows
-  *Developer Mode* (Settings → System → For developers) or set `HF_HUB_DISABLE_SYMLINKS_WARNING=1`.
-- The news-sentiment model (**FinBERT**, ~440 MB) downloads automatically the first time you open the News tab.
+> Each time you open a new terminal, run `.venv\Scripts\activate` before the Python commands.
 
 ---
 
-## 4. API keys: accounts to create
+## 2. OANDA demo account (live forex prices)
 
-All of these have free tiers. Only the **Claude** key is needed for the agent chat. Everything else adds
-features, and the app still works without them (it says what's missing).
+XTB closed its API in 2025, so the app can't read prices from XTB. It uses a free **OANDA demo (practice)
+account** instead. That gives real-time forex and gold prices, the live spread, and years of 1-minute history.
+You keep trading on XTB as usual. OANDA is only the price feed, and the app never places orders anywhere.
 
-| # | Service | Used for | Free tier | Sign up / get key |
-|---|---|---|---|---|
-| 1 | **Anthropic (Claude)** | the AI agent chat | pay-as-you-go (add credit) | https://console.anthropic.com → *Settings → API keys* |
-| 2 | **FRED** (St. Louis Fed) | interest rates, CPI, GDP, US release calendar | free, 120 req/min | https://fredaccount.stlouisfed.org/login/secure/ → *My Account → API Keys* (info: https://fred.stlouisfed.org/docs/api/api_key.html) |
-| 3 | **Finnhub** | company news, peers (sector P/E), earnings calendar | free, 60 req/min | https://finnhub.io/register → key on https://finnhub.io/dashboard |
-| 4 | **Marketaux** | news with sentiment (covers Indian stocks) | free, 100 req/day | https://www.marketaux.com/register → key on the dashboard |
-| 5 | **Twelve Data** | backup price source if Yahoo fails | free, 800 req/day (NSE/BSE needs a paid plan) | https://twelvedata.com/register → https://twelvedata.com/account/api-keys |
-| 6 | Hugging Face | only if the model download asks (see step 3) | free | https://huggingface.co/settings/tokens |
-| 7 | CallMeBot or Twilio | WhatsApp alerts (optional) | see step 9 | see step 9 |
+**Without OANDA** everything still works, but forex prices come from Yahoo, are a little delayed, and the top bar
+says **Delayed** instead of **Live**.
 
-**Yahoo Finance** (via `yfinance`) is the main price and fundamentals source. It needs **no account**.
+### Getting the token
+1. Go to https://www.oanda.com and open a **demo / practice account** (free, no deposit, no ID check for a demo).
+   If OANDA doesn't offer a demo in your country, skip this section.
+2. Log in to the demo account on the OANDA website.
+3. Open **My Account → Manage API Access** (on some versions: *Tools → API*) and click **Generate**.
+4. Copy the token (a long string of letters and numbers with a dash in the middle). Treat it like a password.
+5. In `.env`:
+   ```
+   OANDA_API_TOKEN=paste-your-token-here
+   OANDA_ENVIRONMENT=practice
+   ```
+   `OANDA_ACCOUNT_ID` can stay empty: the app finds it from the token.
+6. Restart the backend. The dot in the top bar turns green with **Live**, and the chart footer says *OANDA live*.
 
-### Getting the Claude API key step by step
-1. Go to https://console.anthropic.com and sign up (it may redirect to platform.claude.com).
-2. Go to **Billing** and add a small amount of credit (e.g. $5–10). The API is billed separately from a Claude.ai subscription.
-3. Go to **Settings → API keys → Create Key**, name it "ShreeAgent", and copy the key (`sk-ant-...`). It's shown only once.
-4. Optional: set a monthly spend limit under **Limits**.
+### Limits and cost
+| | |
+|---|---|
+| Cost | Free. A demo account has no fees and no expiry while you use it. Inactive demo accounts may be closed after a while; just open a new one and make a new token |
+| Price updates | Up to about 4 per second per symbol while the price moves. The app uses **one** price stream for all your symbols |
+| History | Candles from 1 minute up, several years back |
+| What's covered | Forex pairs, gold and silver, some indices. **Not** single stocks |
+| Practice vs XTB prices | Very close but not identical (different liquidity providers). Differences of 0.1–0.3 pips on EUR/USD are normal. **Always place orders with the prices XTB shows** |
+| Spread | OANDA's demo spread is shown in the top bar. Your XTB spread may be slightly different; set yours in `SPREAD_PIPS` |
+| Token security | The token stays on your computer in `.env`. It is never sent to the browser. If it leaks, revoke it on the same OANDA page and generate a new one |
 
-Default models: `claude-sonnet-5-5` for chat (fast, cheaper). The **Deep mode** toggle uses `claude-opus-5-5`.
-A full analysis is typically a few cents with Sonnet.
+### Stocks ("all global stocks")
+No free source streams every stock exchange in real time. Stocks come from **Yahoo**. The app checks every
+15 seconds (`LIVE_POLL_SECONDS`), and the data is delayed up to about 15 minutes on many exchanges. Stock prices
+are always labelled **Delayed**. Use exchange suffixes: `SAP.DE` (Xetra), `VOD.L` (London), `MC.PA` (Paris),
+`ASML.AS`, `NESN.SW`, `7203.T` (Tokyo), `0700.HK`, `SHOP.TO`, `BHP.AX`, `RELIANCE.NS` (India NSE), and plain
+tickers for the US (`AAPL`).
 
 ---
 
-## 5. Fill in `.env`
+## 3. Fill in `.env`
 
 ```powershell
 copy .env.example .env      # Linux/macOS: cp .env.example .env
 notepad .env
 ```
-Paste each key after the `=` with no quotes or spaces, e.g.:
-```
-ANTHROPIC_API_KEY=sk-ant-api03-xxxxxxxx
-FRED_API_KEY=abcd1234...
-FINNHUB_API_KEY=...
-MARKETAUX_API_KEY=...
-TWELVEDATA_API_KEY=...
-```
-Every variable is described inside `.env.example`. Useful settings:
-- `LLM_EFFORT`: `low` / `medium` (default) / `high`. Higher means more thorough answers and more tokens.
-- `TIMESFM_DEVICE`: `auto` (uses the GPU if present), `cpu` or `cuda`.
-- `SENTIMENT_MODEL=lexicon` skips the FinBERT download, at lower quality.
+Paste each value after the `=`, without quotes or spaces. **Every setting is optional.** A missing key turns off
+only the feature that needs it, and the app tells you which one.
 
-`.env` is in `.gitignore` and must **never** be committed or shared. If a key leaks, delete it on the provider's site
-and create a new one.
+| Key | What it adds | Free? | Where |
+|---|---|---|---|
+| `OANDA_API_TOKEN` | live forex/gold prices and spread | free | section 2 |
+| `ANTHROPIC_API_KEY` | **Ask AI** chat, AI news summaries, optional AI wording | pay-as-you-go | https://console.anthropic.com → *Settings → API keys* (add a few dollars of credit under *Billing*) |
+| `FRED_API_KEY` | interest rates, inflation, the actual numbers of US releases | free | https://fredaccount.stlouisfed.org → *API Keys* |
+| `FINNHUB_API_KEY` | company news, peers, earnings dates | free | https://finnhub.io/dashboard |
+| `MARKETAUX_API_KEY` | more news with sentiment | free (100/day) | https://www.marketaux.com |
+| `TWELVEDATA_API_KEY` | backup price source if Yahoo fails | free (800/day) | https://twelvedata.com/account/api-keys |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | trade alerts on your phone | free | section 8 |
 
-The dashboard sidebar → **Configuration status** shows which keys were picked up. Restart the app after editing `.env`.
+Settings most useful for an XTB EUR/USD trader (defaults in brackets):
+- `ACCOUNT_SIZE` (1000), `ACCOUNT_CURRENCY` (EUR), `RISK_PER_TRADE_PCT` (1.0): used for the lot size on every card.
+- `SPREAD_PIPS` (1.0): your XTB EUR/USD spread. It's added to the stop so the spread alone can't hit it.
+- `LEVERAGE` (30), `FX_LOT_SIZE` (100000), `FX_MIN_LOT` (0.01): XTB / EU retail rules. Leave them unless XTB changes them.
+- `SIGNAL_MIN_RR` (1.5): only BUY/SELL when the possible gain is at least 1.5× the possible loss.
+- `ALERT_EVENTS`: which trade-plan events alert you (section 8).
+
+Every variable is explained inside `.env.example`. Restart the backend after editing `.env`.
+
+`.env` is git-ignored and must **never** be committed or shared. If a key leaks, delete it on the provider's
+site and create a new one.
 
 ---
 
-## 6. Run the app
+## 4. Run it
 
-### Locally
+### Option A: Docker (one command)
+Start Docker Desktop and wait until it says *Running*. Then, in the project folder:
+```powershell
+docker compose up -d --build           # first build ~10 min, later starts take seconds
+```
+Open **http://localhost:8080**. That's it.
+
+| Command | What it does |
+|---|---|
+| `docker compose logs -f backend` | watch the backend log |
+| `docker compose down` | stop everything |
+| `git pull; docker compose up -d --build` | update to the latest version |
+| `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build` | use an NVIDIA GPU |
+| `docker compose --profile legacy up -d` | also start the old Streamlit dashboard on http://localhost:8501 |
+| `docker compose --profile alerts up -d` | also start the daily WhatsApp watchlist scan |
+
+Containers: `backend` (API, live prices, analysis, alerts; port 8000 on your computer only, API docs at
+http://localhost:8000/docs) and `web` (the app, port 8080). Models and the data cache live in Docker volumes, so
+they download once. Your watchlist, drawings and history are in `./user_data/`.
+
+### Option B: without Docker (two terminals)
+**Terminal 1, backend:**
 ```powershell
 .venv\Scripts\activate
-streamlit run ui/app.py
+python -m server                       # http://localhost:8000 (API docs at /docs)
 ```
-Your browser opens at http://localhost:8501. Stop it with `Ctrl+C`.
-
-### With Docker
-Start Docker Desktop first, then:
+**Terminal 2, web app:**
 ```powershell
-docker compose up -d --build              # first build takes ~5-10 min
+cd web
+npm run dev                            # http://localhost:5173
 ```
-Open http://localhost:8501. Other commands:
-```powershell
-docker compose logs -f app                # view logs
-docker compose down                       # stop
-docker compose up -d --build              # after pulling new code
-# NVIDIA GPU:
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
-```
-Model weights and the data cache live in Docker volumes, so they download only once. Your watchlist is in
-`./user_data/`.
+Open **http://localhost:5173**. Stop either one with `Ctrl+C`.
 
-### Using the dashboard
-- **Sidebar:** search a stock or pair by name ("Tata Motors", "Apple", "GBP/USD"), then click **Analyse** or **➕ Watchlist**.
-- **Chart:** candlesticks with indicator overlays and panels, plus S/R lines.
-- **Signals:** one plain-language BUY / SELL / WAIT card per watchlist symbol, with entry, stop loss, targets,
-  position size and history (see [Part A](#part-a-the-new-signals-section-upgrade-guide)). The old
-  multi-timeframe table is under **🔬 Technical breakdown** at the bottom of the tab.
-- **Forecast:** TimesFM-3 with confidence bands, and a backtest.
-- **Fundamentals / News:** financial ratios or the FX macro picture, plus headline sentiment.
-- **Agent:** chat in plain language, e.g. *"Analyse EUR/USD for this week"*, *"Is RELIANCE a buy right now?"*,
-  *"Compare TCS and INFY fundamentals"*. Download any answer as .md or .pdf.
-- **Report:** a rule-based full report with no LLM cost, downloadable as Markdown or PDF.
-- **Watchlist scan:** scans every watchlist symbol and can send the result to WhatsApp.
-
-Every report has a **"Cross-check on Investing.com"** link. Use it to compare the price and levels manually.
+- The first start takes 1–2 minutes while models load. After that the chart opens in under 2 seconds.
+- The backend runs everything in one process: live prices, analysis at each candle close, forecasts, alerts.
+  No Redis or extra services are needed.
+- To serve a built version instead of the dev server: `cd web; npm run build`. The files land in `web/dist/`
+  (Docker does this for you).
 
 ---
 
-## 7. Adding symbols to the watchlist
+## 5. Tour of the five tabs
 
-**From the dashboard:** type a name in the sidebar search, pick the match, and click **➕ Watchlist**. Remove a symbol with **✕**.
+**Top bar (always visible):** symbol search (type a name, e.g. "Apple", "EUR/USD", "Siemens"), your watchlist,
+live price and today's % change, the current spread, the trading session (Asia / London / New York / overlap), the
+connection dot, the 🔔 alerts bell, the light/dark switch, and **Ask AI** (chat about any symbol).
 
-**By editing the file** `user_data/watchlist.yaml` (created on first run):
-```yaml
-symbols:
-  - EUR/USD
-  - XAU/USD
-  - RELIANCE.NS     # NSE stock: add .NS
-  - 500325.BO       # BSE stock: add .BO (BSE code or symbol)
-  - AAPL            # US stock: plain ticker
-```
-Symbol formats:
-| Market | Format | Examples |
-|---|---|---|
-| Forex | `BASE/QUOTE` | `EUR/USD`, `GBP/USD`, `USD/JPY`, `USD/INR` |
-| Gold / Silver | `XAU/USD`, `XAG/USD` | prices come from COMEX futures (GC=F / SI=F), which track spot closely |
-| US stocks | ticker | `AAPL`, `MSFT`, `NVDA` |
-| NSE | ticker + `.NS` | `TCS.NS`, `INFY.NS`, `HDFCBANK.NS` |
-| BSE | ticker/code + `.BO` | `RELIANCE.BO`, `500325.BO` |
+| Dot | Meaning |
+|---|---|
+| 🟢 **Live** | real-time prices (OANDA) |
+| 🟡 **Delayed** | Yahoo prices, up to ~15 min late |
+| ⚪ **Market closed** | weekend or outside trading hours. Forex closes Friday 23:00 and reopens Sunday 23:00 (CET) |
+| 🔴 **Offline** / **Stale** | no connection, or no new price for over a minute while the market is open. Cards and plans grey out so you never act on old prices. The app reconnects by itself and fills the gap |
 
-**Optional:** to get an exact Investing.com link instead of a search link, and short aliases, add the stock to
-`config/symbols.yaml`:
-```yaml
-stocks:
-  "ITC.NS": {investing: equities/itc, aliases: [itc]}
-```
-The `investing` value is the part of the Investing.com URL after `https://www.investing.com/`.
+1. **Chart.** Live candles from 1 minute to weekly. Candles, line or Heikin Ashi. **ƒx Indicators** adds EMA 21/50/200,
+   SMA 20/50, Bollinger Bands, VWAP, volume, RSI, MACD, Stochastic and ATR. Hover for open/high/low/close, scroll to zoom, drag to
+   move back in time. **✏ Draw** opens the drawing tools, **✨ AI analysis** shows the app's own lines and zones
+   (section 7), and **📷 Screenshot** saves a PNG. The footer counts down to the next candle.
+2. **Trade Plan.** One beginner card per watchlist symbol: BUY, SELL or WAIT, with the entry, stop loss, targets,
+   lot size and what would cancel it. The card's status updates live. See section 6.
+3. **Fundamentals.**
+   - Economic calendar (today / this week) with a countdown to the next big event, and a plain line per event
+     on what it usually means for your pair.
+   - Central-bank rates and next meetings.
+   - A currency strength meter (28 pairs).
+   - News with sentiment and one-line AI summaries, and the overall fundamental bias.
+   - For stocks: key company numbers in plain words, earnings date and analyst views.
+4. **Forecast.**
+   - The TimesFM-3 forecast for 15M / 1H / 4H / Daily, with 50% and 80% ranges.
+   - A sentence like *"The model expects EUR/USD between 1.0990 and 1.1046 in the next 24 hours"*.
+   - How the model scores against simple guesses ("price stays the same", "trend continues"), and its live
+     accuracy on past forecasts.
+   - Whether it agrees with the trade plan. **For major forex pairs the model is often no better than "price stays
+     the same". The tab tells you when that's the case: then don't give the forecast much weight.**
+5. **Performance.** How each setup did in backtests (out-of-sample) and live, in plain words and as tables. See
+   section 9.
 
 ---
 
-## 8. Forecast backtests: running them and reading the results
+## 6. Reading a Trade Plan card (EUR/USD example)
 
-A backtest replays history. At each of N past dates it gives TimesFM-3 only the data up to that date, asks for the
-next *h* candles, and compares the forecast with what really happened. It also scores a **naive baseline**
-("price stays where it is"), which is surprisingly hard to beat in liquid markets.
+At the top of the tab:
+- **Intraday (15 min) / Swing (daily).** Intraday plans are same-day trades on the 15-minute chart. Swing shows
+  the daily cards (several days per trade).
+- **Filter:** All / Buy / Sell / Get ready / Wait. Cards are sorted strongest first.
+- **Account size, Risk per trade %, Currency → Update sizes:** the lot size and euro amounts on every card use
+  these. Defaults come from `.env` (`ACCOUNT_SIZE`, `RISK_PER_TRADE_PCT`, `ACCOUNT_CURRENCY`).
 
-**From the dashboard:** Forecast tab → pick the horizon → **Run backtest**.
+### A BUY card
+```
+EUR/USD  1.09440  Trending up · London session          Last updated 12:00:03 · next candle 04:12
+██ BUY ██  Confidence MEDIUM – 4 checks agree · No backtest yet – treat as unproven
+Waiting → Ready → Entry triggered → In trade → Result
+
+Buy only if the price breaks above 1.0950.
+WHY?
+ • The bigger charts and today's 1-hour chart point up.
+ • The 15-minute chart is making higher lows.
+ • Buying pressure is building.
+
+Entry       Buy only if the price breaks above 1.0950 (Buy Stop order) · 6 pips away
+Stop loss   1.0931 (19 pips) · −€8.70
+            Beyond the other side of the sideways range: then the breakout has failed.
+Target 1    1.0981 (+31 pips) · +€14.20
+Target 2    1.1002 (+52 pips) · +€23.80
+Reward      You risk €8.70 to make €14.20 at target 1 (€23.80 at target 2)
+Size        Buy 0.05 lots   If the stop loss is hit you lose about €8.70 (1% of €1,000).
+Break-even  When the price reaches 1.0969 (+1 × your risk), move the stop loss to your entry 1.0950.
+Close by    21:30 (Berlin time) at the latest. This is a same-day trade.
+Cancel if   • a 15-minute candle closes below 1.0931 before you are in
+            • the order hasn't filled by 15:00
+When        likely within the next 1–3 hours (rough estimate)
+⚠ CPI m/m (USD) at 14:30 – no new trades 14:00–15:00.
+[mini 15-minute chart with the entry, stop and targets drawn in]          ▸ Show details
+Analysis only, not financial advice. Always use a stop loss.
+```
+*(Illustrative numbers for a €1,000 account risking 1%. Your cards show live prices.)*
+
+How to read it, top to bottom:
+1. **The label.** **BUY** (green) / **SELL** (red): a trade idea with exact prices. **GET READY** (yellow): the
+   price is close to the entry, so open XTB and prepare the order. **WAIT** (amber): no trade now (see below).
+2. **Confidence** counts how many independent checks agree. The percentage next to it is **how often this kind of
+   setup reached target 1 before the stop in past tests** (Performance tab). *"No backtest yet – treat as unproven"*
+   means there's no test data yet.
+3. **The status line** moves by itself as the price moves: *Waiting* (price not there yet) → *Ready* (close to the
+   entry) → *Entry triggered* (the entry price traded) → *In trade* → the result (*Target 1 / Target 2 / Stop loss /
+   Break-even / Time stop / Cancelled / Expired*). Each step can send an alert (section 8).
+4. **Entry** and the order type:
+   - **Buy Stop / Sell Stop** = buy only once the price rises *to* the level (a breakout). In xStation: *New
+     order → Pending → Buy Stop*, price 1.0950.
+   - **Buy Limit / Sell Limit** = buy when the price dips back *to* the level (a pullback).
+   - *"6 pips away"* updates live.
+5. **Stop loss:** type this exact price in the *Stop loss* field of the XTB order **before** you place it. The
+   euro amount is what you lose if it's hit. The spread (`SPREAD_PIPS`) is already included.
+6. **Targets:** put **Target 1** in the *Take profit* field. A common beginner approach: close half at target 1
+   and let the rest run to target 2 with the stop moved to the entry.
+7. **Size:** type the lots (e.g. `0.05`) in the *Volume* field. 0.01 lots = 1,000 EUR, the smallest trade. Sizes
+   are always **rounded down**, so you never risk more than you chose. If even 0.01 lots is too much risk, the
+   card says so: skip the trade rather than moving the stop.
+8. **Break-even:** once the trade is up by as much as you risked, move the stop to your entry. From then on the
+   trade can't lose money (apart from the spread).
+9. **Close by:** intraday trades are closed by 21:30 Berlin time (`FLAT_BY`), so nothing stays open overnight.
+   No new entries after 18:00 (`NO_NEW_ENTRIES_AFTER`).
+10. **Cancel if:** if any of these happens before you're in, delete the pending order in XTB.
+11. **⚠ News:** no new trades from 30 minutes before to 30 minutes after a big release (`NEWS_BLACKOUT_MINUTES`).
+- **Grey card:** the prices are old (connection lost, or the market is closed). Don't act on a grey card.
+- **Words with a dotted underline** (Sideways, Stop order, Lot, …): hover or tap for a one-line explanation.
+- **▸ Show details:** the analysis behind the card: each timeframe's direction (daily, 4H, 1H, 15M, 5M), every
+  confirmation, the checks that passed or failed, the spread, and the score.
+
+### A WAIT card
+WAIT is the normal state, and it's on purpose. A BUY/SELL needs **all** of these:
+- the daily and 4-hour charts aren't against the trade, and the 1-hour chart agrees;
+- a 15-minute setup and a 5-minute trigger;
+- at least 3 independent confirmations;
+- a possible gain of at least 1.5× the risk (`INTRADAY_MIN_RR`);
+- no big news within 30 minutes, an allowed time of day, and a spread under the limit (`MAX_SPREAD_PIPS`, 2.0
+  pips for EUR/USD);
+- fewer than 2 stop losses today (`DAILY_LOSS_LIMIT`).
+
+A WAIT card tells you what's missing and what would change it:
+```
+EUR/USD  1.09300  Sideways
+██ WAIT ██
+WAIT – stuck between 1.0912 and 1.0948.
+WHAT I'M WAITING FOR
+ • The 1-hour chart has no clear direction today.
+ ┌ Buy if it breaks above 1.0950 ┐  ┌ Sell if it breaks below 1.0910 ┐
+ │ 60% likely – the bigger charts │  │ 40% likely                     │
+ │ are rising                     │  │                                │
+ └────────────────────────────────┘  └────────────────────────────────┘
+```
+The two boxes are the two ways out of the range and which one is more likely. When one breaks, the card turns
+into a GET READY / BUY / SELL plan by itself at the next 15-minute close.
+
+**Swing (daily)** cards work the same way on the daily chart (entries valid for a few days, no close-by time).
+They're explained in detail in [docs/legacy-streamlit.md](docs/legacy-streamlit.md).
+
+---
+
+## 7. Drawing tools and the AI analysis overlay
+
+### Drawing tools
+Click **✏ Draw** and pick a tool. A hint at the top of the chart says how many clicks are left. Press **Esc** to
+cancel.
+
+| Tool | Clicks |
+|---|---|
+| Trendline | start, then end |
+| Horizontal line | the price level |
+| Zone (rectangle) | one corner, then the opposite corner |
+| Fibonacci | swing start, then swing end (shows 23.6 / 38.2 / 50 / 61.8 / 78.6 %) |
+| Parallel channel | line start and end, then a point for the parallel line |
+| Text note | where the note goes |
+
+- **Select** a drawing by clicking it. Press **Delete** (or Backspace) to remove it.
+- Drawings are **saved per symbol** on the backend (`user_data/`). They're still there after a restart, on
+  every timeframe and on other devices that open the same app.
+
+### AI analysis overlay
+Click **✨ AI analysis** to let the app draw what its analysis engine sees. The **▾** next to it chooses the layers:
+
+| Layer | What it shows |
+|---|---|
+| Trade plan | entry zone, stop loss and targets of the current plan |
+| Trendlines & channels | lines through swing highs/lows that the price respected (with the number of touches) |
+| Support & resistance | price areas touched several times. Darker = stronger |
+| Market structure | higher highs / lower lows, **BOS** (break of structure: the trend continues) and **CHoCH** (change of character: the trend may be turning) |
+| Fibonacci | retracement levels of the last big swing |
+| Liquidity | previous day/week high and low, the Asian session range, equal highs/lows, round numbers, and stop hunts (a wick through a level that closes back inside) |
+| Order blocks, gaps, supply/demand | where big orders probably sit |
+
+The overlay is calculated from **completed candles only**, so it never uses future data. It refreshes at each
+candle close. It's not "AI" in the chat sense: the same rules always give the same lines, which makes them easy to
+check by eye.
+
+---
+
+## 8. Alerts: Telegram, desktop, WhatsApp
+
+Alerts fire when a trade plan changes state:
+
+| Event (`ALERT_EVENTS` name) | Example |
+|---|---|
+| `get_ready` | 🔔 Get ready: EUR/USD is 5 pips from the entry |
+| `entry_triggered` | 🚀 Entry triggered: price broke above 1.0952, the BUY plan is active |
+| `tp_hit` | ✅ Target 1 / Target 2 hit |
+| `sl_hit` | ❌ Stop loss hit |
+| `cancelled` | 🚫 Setup cancelled (and why) |
+| `breakeven`, `time_stop`, `expired` | off by default. Add them, or use `all` |
+
+The same alert isn't repeated for the same plan within `ALERT_DEDUPE_MINUTES` (30). Alerts are sent by the
+backend, so they work while the app is closed, **as long as the backend is running**.
+
+### Desktop notifications (no setup)
+Click the 🔔 bell in the top bar → **Enable desktop alerts** → allow. The bell also keeps a list of recent alerts.
+Desktop pop-ups need the app open in a browser tab, which can be in the background.
+
+### Telegram (recommended for your phone, free)
+1. In Telegram, open **@BotFather**, send `/newbot`, and pick a name and a username ending in `bot`.
+2. BotFather replies with a token like `1234567890:AAH...`. Put it in `.env` as `TELEGRAM_BOT_TOKEN=...`.
+3. Open your new bot in Telegram and send it any message (e.g. "hi"). A bot can only message you after you've
+   written to it.
+4. Get your chat id and test it:
+   ```powershell
+   python -m alerts.telegram --chat-id     # prints your chat id
+   ```
+   Put it in `.env` as `TELEGRAM_CHAT_ID=...`, then:
+   ```powershell
+   python -m alerts.telegram --test        # you should get a test message
+   ```
+5. Restart the backend.
+
+### WhatsApp (optional)
+Set up CallMeBot or Twilio as described in [docs/legacy-streamlit.md](docs/legacy-streamlit.md) and the WhatsApp
+part of `.env.example`. Then set `ALERTS_WHATSAPP=true` to also send trade-plan alerts there. The daily watchlist
+scan (`python -m alerts.scheduler`, or the Docker `alerts` profile) still sends its morning summary.
+
+---
+
+## 9. Backtests and tests
+
+### What a backtest does
+A backtest replays past prices candle by candle and runs **the same engine as the Trade Plan tab** on them. At each
+15-minute close it only sees candles that had finished by then, then checks every 5-minute candle afterwards to see
+whether the entry filled and whether the stop or a target was hit first. It's built to be cautious:
+- Buys fill at the ask and sells at the bid. Without real bid/ask data, half the typical spread is added.
+- Slippage (`BACKTEST_SLIPPAGE_PIPS`, 0.2) and commission (`BACKTEST_COMMISSION_PIPS`, 0) are charged.
+- If the stop and a target are both touched in the same candle, it counts as the stop.
+- The close-by time, the daily loss limit and the news blackout apply as in live trading.
+- **Walk-forward:** settings are chosen on 12 months, then tested on the *next* 3 months the engine has never
+  seen, then the window moves on. **Only those unseen test months are reported** (*out-of-sample*).
+
+### Running one
+**In the app:** Performance tab → **Run backtest**. A progress bar shows while it runs in the background (minutes
+with Yahoo data, about an hour for 2 years of OANDA data).
 
 **From the command line:**
 ```powershell
-python scripts/run_backtest.py EUR/USD
-python scripts/run_backtest.py RELIANCE.NS AAPL --timeframe 1d --horizons 5 10 30 --windows 40
-python scripts/run_backtest.py --watchlist
-python scripts/run_backtest.py EUR/USD --univariate      # price only, no related assets / volume
+python scripts/download_history.py EUR/USD --years 2          # stores 5-minute to daily bars locally
+python scripts/run_intraday_backtest.py EUR/USD                # prints the report, updates the cards
+python scripts/run_intraday_backtest.py EUR/USD --setups trend_pullback squeeze_breakout --months 12
+python scripts/run_intraday_backtest.py EUR/USD --no-write     # report only, don't change the cards
 ```
-Each backtest takes ~30-60 s on CPU. Results are saved in `.cache/backtests/`, and the agent and reports use them
-automatically to decide how much weight to give the forecast.
 
-Example output:
-```
-symbol        tf      h  win   MAPE%  naive%   dir%  cov80%   skill  trust
-EUR/USD       1d      5   30    0.38    0.38     57      82  -0.003  very low (no better than naive)
-```
-How to read it:
-| Column | Meaning | Good value |
-|---|---|---|
-| `MAPE%` | average % error of the forecast path | lower than `naive%` |
-| `naive%` | the same error for "no change" | the benchmark |
-| `dir%` | % of windows where the up/down direction was right | **> 55%**. 50% is a coin flip |
-| `cov80%` | % of actual prices inside the 10–90% band | **≈ 80%** (much lower means the bands are too narrow) |
-| `skill` | `1 − MAE_model / MAE_naive` | **> 0** beats naive. 0.05+ is meaningful |
-| `trust` | summary used by the agent | `moderate` > `low` > `very low` |
+> **You need the OANDA token for a real backtest.** Yahoo only keeps about **60 days of 5-minute candles** and has
+> no bid/ask prices. With Yahoo data the backtest can't do the 12 + 3 month walk-forward. It uses one split
+> instead (settings chosen on the first 60%, tested on the last 40%) and labels the result
+> **"a rough guide, not proof"**.
 
-Be realistic. For major FX pairs, short-horizon forecasts are often no better than naive, as in the EUR/USD
-example above. Treat the forecast as one input among many, and trust it only where its backtest says it has an edge.
-Re-run backtests every few weeks, because market behaviour changes.
+### Reading the Performance tab
+- **The lines at the top** sum up each setup in plain words, e.g. *"Pullback in the trend reached target 1 in 58 of
+  100 trades on EUR/USD (last 2 years, out-of-sample); on average +2.1 pips per trade after costs."*
+- **The table** (click a column header to sort; it can be split by session). Hover a header for its meaning.
 
----
+  | Column | Meaning | Good sign |
+  |---|---|---|
+  | Trades | number of test trades | 50+ before you trust the rest |
+  | Target 1 first | % of trades that reached target 1 before the stop | well above 50% isn't needed: with targets further away than the stop, ~40% can be enough |
+  | Profit factor | pips won ÷ pips lost | **at least 1.15**. Below 1 loses money |
+  | Avg per trade | average pips per trade after spread and costs (*expectancy*) | above 0 |
+  | Worst dip | the biggest drop of the running total from a high point (*max drawdown*), in pips | small compared with the total |
+  | Time to target 1 | typical time from entry to target 1 | fits inside the trading day |
+- **Live vs backtest:** your real plan results next to the range the backtest expected. *"Live results are inside
+  the range the backtest expected"* is what you want. *"Below"* after 20+ trades means the market has changed:
+  trade smaller or pause that setup.
+- **Equity curve:** the running total in pips, for the backtest and for live plans.
 
-## 9. WhatsApp alerts (optional)
+### How results change the Trade Plan cards
+- The card's percentage (*"~58% reached target 1 first (212 similar past setups)"*) comes from these results,
+  for the same setup in similar conditions (session, trend, direction). Small groups are pulled toward the
+  setup's average so a lucky streak doesn't look better than it is.
+- **Switched off:** with at least 50 test trades (`BACKTEST_MIN_TRADES`), a setup whose profit factor is below
+  1.15 or whose win rate could just be luck stops giving BUY/SELL plans. The tab lists it with the reason.
+- **Unproven:** with fewer than 50 test trades (always the case with Yahoo data), the setup stays on. The card
+  then says *"– too few tests to trust yet"*, and that number doesn't change the confidence.
 
-The scanner runs the rule-based analysis on your watchlist (no LLM cost) and sends a digest like:
-```
-🔴 EUR/USD 1.10534 | bearish -41 (Medium)
-   ⚡ strong bearish, new SELL signal
-   👉 *SELL* 1.10534-1.10728 · SL 1.11513 · TP1 1.09408 / TP2 1.08950 (risk 1 → make 1.62)
-```
-A WAIT shows its first condition instead, e.g. `👉 *WAIT*: Wait until after the US inflation report tomorrow (Thu 19 Nov)`.
-A symbol is flagged when its combined score passes `ALERT_SCORE_THRESHOLD`, when its bias changed since the last
-scan, when daily RSI is at an extreme, or when a new BUY/SELL signal appears. The scan uses the same cards as the
-Signals tab and also updates the signal history.
-
-### Option A: CallMeBot (free, easiest, for your own number)
-1. Read the current instructions at https://www.callmebot.com/blog/free-api-whatsapp-messages/. It lists the
-   CallMeBot phone number to use, which can change.
-2. Save that number in your phone contacts.
-3. Send it the WhatsApp message: `I allow callmebot to send me messages`
-4. You'll receive your **API key** by WhatsApp within a couple of minutes.
-5. In `.env`:
-   ```
-   WHATSAPP_BACKEND=callmebot
-   CALLMEBOT_PHONE=+919876543210
-   CALLMEBOT_API_KEY=123456
-   ```
-
-### Option B: Twilio (official WhatsApp API, paid after the trial credit)
-1. Sign up at https://www.twilio.com/try-twilio.
-2. In the Console go to **Messaging → Try it out → Send a WhatsApp message** and follow the steps to join the
-   **sandbox**: send `join <your-code>` from your phone to the sandbox number.
-3. Copy your **Account SID** and **Auth Token** from the Console home page.
-4. In `.env`:
-   ```
-   WHATSAPP_BACKEND=twilio
-   TWILIO_ACCOUNT_SID=ACxxxxxxxx
-   TWILIO_AUTH_TOKEN=xxxxxxxx
-   TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
-   TWILIO_WHATSAPP_TO=whatsapp:+919876543210
-   ```
-   The sandbox session expires after 72 h of inactivity. Re-send the `join` message if alerts stop.
-
-### Test and schedule
+### Running the tests
+Everything runs offline with made-up data, no API keys needed.
 ```powershell
-python -m alerts.scheduler --now                 # scan once and send now
-python -m alerts.scheduler                       # keep running; scans Mon-Fri at SCAN_TIME
-python -m alerts.scheduler --only-flagged        # only send symbols with alerts
+.venv\Scripts\activate
+python -m pytest                          # all backend tests (~270)
+python -m pytest -k intraday -v           # the Trade Plan engine and backtests, one line each
+cd web
+npm test                                  # web app tests (~65)
+npx tsc -b                                # type check
+npx playwright install chromium           # once
+npx playwright test                       # opens the real app in a browser: chart loads in < 2 s, tabs, drawings, overlay
 ```
-Set `SCAN_TIME=08:00` and `SCAN_TIMEZONE=Asia/Kolkata` in `.env`. Set `SCAN_INCLUDE_FORECAST=true` to add
-TimesFM forecasts (slower).
+The backtest has three special tests against *look-ahead* (accidentally using the future):
+- **Truncation:** cutting off the data after a point doesn't change any trade that closed before it.
+- **Tampering:** changing future candles doesn't change earlier decisions.
+- **Completed candles:** no card ever uses a candle that hadn't closed yet.
 
-**Keep it running:**
-- **Docker:** `docker compose --profile alerts up -d` starts the scheduler container next to the app.
-- **Windows Task Scheduler** (without Docker): create a daily task that runs
-  `C:\path\to\ShreeAgent_AI\.venv\Scripts\python.exe -m alerts.scheduler --now` with
-  *Start in* = `C:\path\to\ShreeAgent_AI`.
+The daily TimesFM forecast backtests (the Forecast tab's "model vs simple guesses") also run from the command
+line: `python scripts/run_backtest.py EUR/USD --timeframe 1d --horizons 5 10 30`.
 
 ---
 
@@ -524,31 +493,30 @@ TimesFM forecasts (slower).
 
 | Problem | Fix |
 |---|---|
-| `ModuleNotFoundError` | Activate the venv (`.venv\Scripts\activate`) and run `pip install -r requirements.txt` again. |
-| `python` not found / opens the Microsoft Store | Reinstall Python with "Add to PATH" ticked, or use `py -3.11` instead of `python`. |
-| "Could not load prices … yfinance returned no data" | Check the ticker: NSE needs `.NS`, BSE `.BO`, and delisted or renamed tickers fail (e.g. Tata Motors is now `TMCV.NS` / `TMPV.NS`). Yahoo may also be throttling you, so wait a few minutes or add `TWELVEDATA_API_KEY` as a backup. |
-| Yahoo `429 Too Many Requests` | Wait 5–10 minutes. Data is cached (`.cache/cache.sqlite`), so repeated views don't refetch. |
-| "Macro data unavailable. Set FRED_API_KEY" | Add the FRED key to `.env` and restart. |
-| One macro value shows `n/a` | FRED sometimes discontinues a series. Find a replacement ID on https://fred.stlouisfed.org and update `config/macro_series.yaml`. |
-| Agent: "API key is invalid or missing" | Check `ANTHROPIC_API_KEY` in `.env` (no quotes or spaces), make sure you have credit, then restart the app. |
-| Agent: "rate limit reached" | Wait a minute. New API accounts have low limits that rise with usage. |
-| TimesFM download fails / `401` | See step 3 (HF token). Check your internet connection and that you have ~2 GB free disk. |
-| Forecast is very slow | The first call loads the model (~10 s plus download). After that, forecasts take ~4 s on CPU. Set `TIMESFM_CONTEXT_LENGTH=512` for faster forecasts. |
-| `CUDA out of memory` | Set `TIMESFM_BATCH_SIZE=2`, or `TIMESFM_DEVICE=cpu`. |
-| GPU not used | `python -c "import torch; print(torch.cuda.is_available())"` must print `True`. Otherwise reinstall torch with the `cu128` index URL (step 2). |
-| News tab slow the first time | FinBERT is downloading (~440 MB, one time only). Set `SENTIMENT_MODEL=lexicon` to skip it. |
-| WhatsApp message not received | Run `python -m alerts.scheduler --now` and read the log. For CallMeBot, check the phone format (`+` and country code) and the API key. For Twilio, re-join the sandbox. |
-| `UnicodeEncodeError` in a Windows terminal | Run `chcp 65001` first, or `set PYTHONIOENCODING=utf-8`. |
-| Docker: `failed to connect to the docker API` | Start Docker Desktop and wait until it says *Running*. |
-| Docker: `env file .env not found` | Create `.env` (step 5) before `docker compose up`. |
-| Docker on Linux: permission denied writing `user_data` | `sudo chown -R 1000:1000 user_data` |
-| Port 8501 already in use | `streamlit run ui/app.py --server.port 8502`, or change `"8501:8501"` to `"8502:8501"` in `docker-compose.yml`. |
-| Stale data or odd results | Delete `.cache/cache.sqlite` (the cache rebuilds itself). Logs are in `.cache/logs/shreeagent.log`. |
-| Central-bank dates wrong | Update `config/events.yaml` from the official calendars linked at the top of that file. |
+| Page at localhost:8080 / 5173 doesn't load | Docker: `docker compose ps` must show both containers *running (healthy)*. Look at `docker compose logs backend`. Without Docker: both terminals (backend **and** `npm run dev`) must be running |
+| Top bar says **Offline** | The backend isn't running or crashed. Check its terminal or `docker compose logs backend`. The app reconnects by itself once it's back |
+| Says **Delayed** although I set OANDA | The token wasn't picked up: check `OANDA_API_TOKEN` (no quotes/spaces), `OANDA_ENVIRONMENT=practice` for a demo token, and restart the backend. The backend log says why OANDA was refused (`401` = wrong or revoked token) |
+| **Market closed** at the weekend | Correct. Forex is closed from Friday 23:00 to Sunday 23:00 CET. Plans and forecasts use the last completed candle and are marked as such |
+| Chart is empty for a stock | Check the ticker and suffix (`SAP.DE`, not `SAP`). Yahoo may be throttling: wait a few minutes or add `TWELVEDATA_API_KEY` |
+| Everything says WAIT | Usually correct: the rules only allow a trade when several things agree. Read *What am I waiting for?* on the card |
+| Alerts don't arrive on Telegram | Run `python -m alerts.telegram --test`. You must have sent your bot a message first. Check `ALERT_EVENTS` |
+| Desktop alerts don't show | The bell says *Blocked in browser*: allow notifications for the site (lock icon in the address bar). Windows *Focus / Do not disturb* also hides them |
+| Fundamentals strength meter slow the first time | It downloads 28 pairs (~30 s), then caches them for 5 minutes |
+| "AI summaries unavailable (no credit)" | Add credit to your Anthropic account. Everything else works without it |
+| Forecast says "Updating now…" for a minute | The first forecast per symbol and timeframe also checks the model against simple guesses: ~1 min on CPU. Later ones take seconds |
+| Central-bank rate shows *old data* | That FRED series is stale. Update the series ID in `config/macro_series.yaml` |
+| `npm` / `node` not found | Install Node.js 22 LTS (section 1) and open a new terminal |
+| `ModuleNotFoundError` | `.venv\Scripts\activate`, then `pip install -r requirements.txt` |
+| Port already in use | Backend: `python -m server --port 8001` (and change the port in `web/vite.config.ts`). Docker: change `"8080:80"` in `docker-compose.yml` |
+| Docker: `failed to connect to the docker API` | Start Docker Desktop and wait for *Running* |
+| Docker: `env file .env not found` | Create `.env` first (section 3) |
+| `UnicodeEncodeError` in the terminal | Run `chcp 65001` first |
+| Odd or old data | Delete `.cache/cache.sqlite` (it rebuilds itself). Logs: `.cache/logs/shreeagent.log` |
 
 Updating later:
 ```powershell
 git pull
-pip install -r requirements.txt
+.venv\Scripts\activate; pip install -r requirements.txt
+cd web; npm install; cd ..
 python -m pytest
 ```

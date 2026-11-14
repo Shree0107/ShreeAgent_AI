@@ -6,7 +6,8 @@ shrink(k, n, p0, m)    (k + m * p0) / (n + m): a beta prior worth m trades at th
 verdict(st)            (enabled, plain reason): off when profit factor < BACKTEST_MIN_PROFIT_FACTOR, fewer than
                        BACKTEST_MIN_TRADES trades, or a win rate not significantly above break-even (one-sided
                        binomial test, p < BACKTEST_SIGNIFICANCE)
-result_files(...)      the per symbol x setup dicts in the schema documented in intraday/probability.py
+result_files(...)      the per symbol x setup dicts in the schema documented in intraday/probability.py. A verdict of
+                       "too few trades" doesn't switch the setup off there: it stays on with unproven=True
 """
 from __future__ import annotations
 

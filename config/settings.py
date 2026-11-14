@@ -137,7 +137,7 @@ class Settings(BaseSettings):
     backtest_test_months: int = 3            # ... then test on the next N months (only these results are reported)
     backtest_grid_min_confirmations: str = "3,4"   # "tuning" choices tried on each training window
     backtest_grid_min_rr: str = "1.5,2.0"
-    backtest_min_trades: int = 50            # fewer test trades than this -> the setup is switched off
+    backtest_min_trades: int = 50            # fewer test trades than this -> "unproven" (stays on)
     backtest_min_profit_factor: float = 1.15 # lower -> switched off
     backtest_significance: float = 0.05      # win rate must beat break-even with this binomial p-value
     backtest_prior_trades: int = 20          # shrinkage strength (pseudo-trades of the average) for small samples

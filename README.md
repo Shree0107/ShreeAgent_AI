@@ -1,67 +1,76 @@
 # ShreeAgent AI
 
-A personal AI trading-analysis assistant for **forex, gold, US stocks and Indian stocks (NSE/BSE)**.
-It combines technical analysis, fundamental/macro analysis, news sentiment and **Google TimesFM-3** price forecasts,
-and a **Claude**-powered agent explains everything in plain language.
+A personal trading-analysis platform in your browser for **forex, gold and global stocks**. It's built for
+beginners: live charts, plain-language **BUY / SELL / WAIT** trade plans, fundamentals, **Google TimesFM-3**
+forecasts and honest backtests. A **Claude**-powered assistant answers questions in plain words.
 
 > **Analysis only.** ShreeAgent AI never places, modifies or cancels trades and has no broker connection.
 > Nothing it produces is financial advice. You make the final decision.
 
-## Features
-- **Technical:** SMA/EMA, RSI, MACD, Bollinger Bands, ATR, Stochastic, ADX, volume/OBV, VWAP, support/resistance,
-  candlestick patterns, trend; multi-timeframe (1H / 4H / D / W) with an explained bullish/bearish/neutral score.
-- **Fundamental:** stocks: P/E vs sector, EPS, growth, margins, ROE, debt, analyst target, earnings date.
-  Forex: policy-rate & yield differentials, inflation, GDP, central-bank lean, upcoming events (FRED + curated calendar).
-- **News sentiment:** Marketaux / Finnhub / Yahoo headlines scored with FinBERT.
-- **Forecasting:** TimesFM-3 zero-shot, multivariate (related assets such as DXY/NIFTY, plus volume), quantile bands,
-  and a rolling **backtest vs a naive baseline** (MAE, MAPE, directional accuracy, interval coverage) so you know how far to trust it.
-- **Beginner signals:** one card per watchlist symbol with a clear **BUY / SELL / WAIT**, plain-language reasons,
-  what to wait for, an exact entry zone, a structure-based stop loss, two targets with % and money, cancel conditions,
-  confidence, event warnings, expiry, an XTB-style position-size helper (lots/shares) and a tracked win rate.
-  BUY/SELL only when the checks agree, no major event is close and reward/risk ≥ 1.5 (configurable).
-- **Agent:** ask *"Analyse EUR/USD for this week"* or *"Is RELIANCE a buy right now?"*. You get a structured report with
-  bias, key levels, entry/SL/TP zones, R:R, risks and confidence. Levels are computed in code, not invented by the LLM.
-- **Dashboard (Streamlit):** watchlist, interactive charts, forecast chart with bands, fundamentals, news, agent chat,
-  Markdown/PDF export, watchlist scan.
-- **Alerts:** daily WhatsApp digest (CallMeBot or Twilio).
-- Every report links to the matching **Investing.com** page for a manual cross-check (no scraping).
+## The five tabs
+- **Chart.**
+  - Live candles from 1 minute to weekly (OANDA demo feed for forex/gold, Yahoo for stocks, labelled
+    *Live* / *Delayed*), drawn with TradingView Lightweight Charts.
+  - Candles, line or Heikin Ashi, indicators, drawing tools saved per symbol, and screenshots.
+  - An **AI analysis overlay** that draws trendlines, channels, support/resistance, market structure (BOS/CHoCH),
+    Fibonacci, liquidity and stop hunts, order blocks, fair value gaps and supply/demand zones.
+- **Trade Plan.**
+  - One beginner card per watchlist symbol for intraday (15-minute) or swing (daily) trading. It gives the exact
+    entry and order type, stop loss, two targets in pips and money, XTB lot size, break-even, close-by time and
+    cancel conditions.
+  - A live status line: Waiting → Ready → Entry triggered → In trade → result.
+  - BUY/SELL only when daily/4H/1H agree, at least 3 confirmations line up, reward/risk is at least 1.5, no big news
+    is within 30 minutes and the spread is normal. Otherwise WAIT, with what would change it.
+- **Fundamentals.** Economic calendar with a countdown and what each release means for your pair, central banks, a
+  28-pair currency strength meter, news with sentiment and AI one-liners, the fundamental bias, and company numbers
+  in plain words.
+- **Forecast.** TimesFM-3 for 15M/1H/4H/D with 50%/80% ranges. It is compared with simple guesses ("no change",
+  drift, moving average), scored on its own past forecasts, and checked for agreement with the trade plan.
+- **Performance.** Walk-forward backtests of the trade-plan engine (out-of-sample only, bid/ask fills, costs,
+  look-ahead tests), live results vs the backtest's expected range, and setups switched off when they don't work.
+
+Also included:
+- **Alerts** on Telegram and as desktop notifications (Get ready, entry, target, stop, cancelled).
+- An **Ask AI** chat, Markdown/PDF reports, and the daily WhatsApp watchlist digest.
+- The classic Streamlit dashboard (`streamlit run ui/app.py`).
 
 ## Quick start
+With Docker, one command:
+```bash
+copy .env.example .env            # optional keys: OANDA token for live forex, Claude key for Ask AI, Telegram ...
+docker compose up -d --build      # then open http://localhost:8080
+```
+Without Docker:
 ```bash
 python -m venv .venv && .venv\Scripts\activate          # Windows  (Linux/macOS: source .venv/bin/activate)
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
-copy .env.example .env                                   # then add your API keys
-streamlit run ui/app.py
+python -m server                                          # backend on http://127.0.0.1:8000 (API docs at /docs)
+cd web && npm install && npm run dev                      # app on http://localhost:5173
 ```
-Or with Docker: `docker compose up -d --build` and open http://localhost:8501.
 
-### New web platform (in progress)
-A faster, TradingView-style web app is being built in phases (FastAPI backend + React frontend). To try it:
-```bash
-python -m server                 # backend on http://127.0.0.1:8000  (API docs at /docs)
-cd web && npm install && npm run dev   # frontend on http://localhost:5173
-```
-Done so far: top bar (search, watchlist, price, session, connection status, light/dark), Chart tab
-(timeframes, candles/line/Heikin Ashi, indicators, crosshair, zoom/scroll, screenshot), Ask AI drawer.
-The classic dashboard (`streamlit run ui/app.py`) keeps working while the new tabs are built.
-
-**Full step-by-step instructions (API keys, model download, alerts, troubleshooting): [SETUP.md](SETUP.md).**
+**Full step-by-step guide (OANDA demo token, .env, reading a Trade Plan card, alerts, backtests,
+troubleshooting): [SETUP.md](SETUP.md).**
 
 ## Project layout
 ```
 config/       settings (.env), symbol aliases + Investing.com links, FRED series, event calendar, default watchlist
-data/         provider interfaces + yfinance / Twelve Data / FRED / Finnhub / Marketaux, SQLite cache, DataService
-analysis/     indicators, levels, patterns, technical (multi-timeframe), fundamental, macro_fx, sentiment, trade_plan, combined
-forecasting/  TimesFM-3 + naive models, input features, backtest, metrics, service
-signals/      beginner BUY/SELL/WAIT engine: structure, levels, decision gates, sizing, events, plain-language
-              templates, locked-number LLM polish, SQLite history + outcome tracking
+data/         providers (yfinance, OANDA, Twelve Data, FRED, Finnhub, Marketaux, ForexFactory calendar), cache;
+              stream/ (OANDA live stream, polling fallback, candle aggregator, market hours)
+analysis/     indicators, levels, patterns, technical (multi-timeframe), fundamental, macro_fx, sentiment, combined;
+              structure/ (swings, trendlines, zones, liquidity, chart patterns, AI overlay); fundtab/ (Fundamentals tab)
+forecasting/  TimesFM-3 + baselines, input features, backtest, live forecasts + accuracy scoring, service
+signals/      daily (swing) BUY/SELL/WAIT engine: levels, decision gates, sizing, events, plain-language templates
+intraday/     15-minute trade-plan engine: sessions, multi-timeframe bias, setups, plan state machine, news filter,
+              spread check, backtest + walk-forward + statistics, probability files
+
 agent/        LLM providers (Claude, OpenAI-compatible), tools, prompt, agent loop, report export
-alerts/       WhatsApp notifiers, watchlist scanner, scheduler
+alerts/       trade-plan alert dispatcher, Telegram, WhatsApp notifiers, watchlist scanner, scheduler
 api/          FastAPI backend: REST + WebSocket hub, background jobs, event bus (python -m server)
 web/          React + TypeScript frontend (Vite, Lightweight Charts, Tailwind); tests: npm test, npx playwright test
 ui/           classic Streamlit dashboard + Plotly charts
-scripts/      download_model.py, run_backtest.py
+scripts/      download_model.py, run_backtest.py, download_history.py, run_intraday_backtest.py
+docs/         legacy-streamlit.md (guide to the classic dashboard's Signals tab)
 tests/        offline unit tests (pytest)
 ```
 
