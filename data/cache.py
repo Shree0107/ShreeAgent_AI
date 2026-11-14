@@ -76,6 +76,11 @@ class Cache:
             self.set(key, val, ttl)
         return val
 
+    def delete(self, key: str) -> None:
+        """Drop one entry (e.g. candles that are known to be behind after a candle close)."""
+        with self._lock, self._conn() as c:
+            c.execute("DELETE FROM kv WHERE k=?", (key,))
+
     def clear(self) -> None:
         with self._lock, self._conn() as c:
             c.execute("DELETE FROM kv")
