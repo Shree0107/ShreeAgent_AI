@@ -34,3 +34,6 @@ Thumbs.db
 node_modules/
 web/test-results/
 web/playwright-report/
+
+# Claude Code local state (agent worktrees, settings)
+.claude/
