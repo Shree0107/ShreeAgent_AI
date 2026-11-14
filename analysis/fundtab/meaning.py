@@ -149,11 +149,14 @@ def meaning(title: str, currency: str, symbol, impact: str = "", actual: str = "
         return f"{lead} → usually makes {name} {'stronger' if stronger else 'weaker'} → {_pair_effect(currency, stronger, symbol)}."
 
     # Not released yet (or no actual number): explain the usual reaction to a higher-than-expected number.
-    noun = "interest rate (or a hint of more hikes)" if rule.type == "rate" else f"{adj} {rule.noun}"
+    if rule.type == "rate":
+        lead = f"A higher {adj} interest rate (or a hint of more hikes)"
+    else:
+        lead = f"Higher {adj} {rule.noun}"
     if not symbol.is_fx:
-        return f"Higher-than-expected {noun} {_stock_effect(rule, True)}."
+        return f"{lead} than expected {_stock_effect(rule, True)}."
     stronger = rule.direction > 0
-    return (f"Higher {noun} usually makes {name} {'stronger' if stronger else 'weaker'} → "
+    return (f"{lead} usually makes {name} {'stronger' if stronger else 'weaker'} → "
             f"{_pair_effect(currency, stronger, symbol)}.")
 
 

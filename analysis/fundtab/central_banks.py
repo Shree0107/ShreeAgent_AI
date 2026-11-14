@@ -38,7 +38,7 @@ def expectation(rate_change_6m: float | None, inflation: float | None, target: f
             score += 1
             reasons.append(f"It raised rates by {rate_change_6m:.2f} points in the last 6 months.")
         else:
-            reasons.append("Rates have not changed in the last 6 months.")
+            reasons.append("Rates have barely changed in the last 6 months.")
     if inflation is not None and target is not None:
         n += 1
         gap = inflation - target
