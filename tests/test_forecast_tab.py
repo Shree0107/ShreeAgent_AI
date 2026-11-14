@@ -352,3 +352,9 @@ def test_agreement_endpoint_uses_plans_when_available(client):
     r = client.get("/api/forecast/agreement", params={"symbol": "EUR/USD", "tf": "1h"}).json()
     assert r["status"] == "disagree" and r["plan"]["source"] == "intraday"
     assert r["text"] == "The forecast points down while the plan says BUY – be careful."
+
+
+def test_verdict_flags_too_narrow_ranges():
+    bt = {**_bt(1.2, 1.0), "coverage_80": 60.0}
+    assert "too narrow" in explain.verdict(bt, "EUR/USD", "1h")["text"]
+    assert "too narrow" not in explain.verdict({**bt, "coverage_80": 78.0}, "EUR/USD", "1h")["text"]

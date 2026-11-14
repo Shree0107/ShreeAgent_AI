@@ -72,6 +72,12 @@ def verdict(bt: dict | None, name: str, tf: str) -> dict:
     dir_acc = bt.get("directional_accuracy")
     dir_txt = f" It called the direction right {round(dir_acc)} times out of 100." if dir_acc is not None else ""
     n = bt["n_windows"]
+    cov = bt.get("coverage_80")
+    if cov is not None and cov < 65:
+        dir_txt += (f" Its ranges have been too narrow: the price stayed inside the wide range only {round(cov)}% "
+                    "of the time instead of about 80%, so expect bigger moves than the bands show.")
+    elif cov is not None and cov > 95:
+        dir_txt += " Its ranges have been wider than needed, so the bands overstate the risk."
     if mae < best * 0.97:
         return {"status": "better",
                 "text": f"In {n} past tests on {name} {tfl} forecasts, the model was more accurate than simple guesses "

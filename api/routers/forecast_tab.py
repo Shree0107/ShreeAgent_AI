@@ -82,16 +82,27 @@ def _check_view(check: dict | None, sym, tf: str, price: float) -> dict:
                              "error_with_extras": _to_units(multi["mae"], pip, price) if multi else None}}
 
 
+def _summary_fmt(sym):
+    """Prices in sentences: forex to the pip (1.0912), like most apps quote ranges; stocks as usual."""
+    import math
+
+    from signals.market import fmt_price, pip_size
+
+    pip = pip_size(sym)
+    if pip:
+        d = max(0, round(-math.log10(pip)))
+        return lambda x: f"{x:,.{d}f}"
+    return lambda x: fmt_price(sym, x)
+
+
 def _forecast_view(rec: dict, sym, tf: str) -> dict:
     from forecasting.accuracy import bands
     from forecasting.explain import direction, summary_sentence
-    from signals.market import fmt_price
-
     b = {k: [round(float(x), 6) for x in v] for k, v in bands(rec["quantiles"]).items()}
     last = rec["last_close"]
     code, words = direction(last, rec["median"][-1], b["q10"][-1], b["q90"][-1], rec["prob_up"])
     text = summary_sentence(sym.ticker, tf, rec["horizon"], last, rec["median"][-1], b["q10"][-1], b["q25"][-1],
-                            b["q75"][-1], b["q90"][-1], rec["prob_up"], lambda x: fmt_price(sym, x))
+                            b["q75"][-1], b["q90"][-1], rec["prob_up"], _summary_fmt(sym))
     return {
         "made_at": rec["made_at"], "last_bar_time": rec["last_bar_time"], "last_close": last, "model": rec["model"],
         "variates": rec["variates"], "dates": rec["dates"], "median": rec["median"], **b,
