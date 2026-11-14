@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from api.deps import get_data, symbol_or_404
+from api.deps import get_data, get_history, symbol_or_404
 from api.serialize import candles as to_candles
 from api.serialize import clean
 from data.providers.base import TIMEFRAMES
@@ -92,6 +92,38 @@ def quote(symbol: str, data=Depends(get_data)):
         return q
     except Exception as e:
         raise HTTPException(502, f"Price data unavailable: {e}") from e
+
+
+_OVERLAY_CACHE: dict[tuple, dict] = {}
+
+
+@router.get("/overlay")
+def overlay(symbol: str, tf: str = "1h", data=Depends(get_data), history=Depends(get_history)):
+    """Everything the 'AI analysis' chart toggle draws: structure, lines, zones, levels, patterns, trade plan."""
+    from analysis.structure.overlay import build_overlay
+
+    if tf not in TIMEFRAMES:
+        raise HTTPException(400, f"timeframe must be one of {list(TIMEFRAMES)}")
+    sym = symbol_or_404(symbol)
+    try:
+        df = data.get_ohlcv(sym, tf)
+    except Exception as e:
+        raise HTTPException(502, f"Price data unavailable: {e}") from e
+    key = (sym.ticker, tf, str(df.index[-1]), len(df))
+    o = _OVERLAY_CACHE.get(key)
+    if o is None:
+        o = clean(build_overlay(df, is_fx=sym.is_fx))
+        if len(_OVERLAY_CACHE) > 64:
+            _OVERLAY_CACHE.clear()
+        _OVERLAY_CACHE[key] = o
+    card = history.latest(sym.ticker)
+    plan = None
+    if card and card.get("action") in ("BUY", "SELL") and card.get("levels"):
+        lv = card["levels"]
+        plan = {"action": card["action"], "entry_low": lv["entry_low"], "entry_high": lv["entry_high"],
+                "stop": lv["stop"], "target1": lv["target1"], "target2": lv["target2"],
+                "generated_at": card["generated_at"], "timeframe": card.get("timeframe")}
+    return {**o, "symbol": sym.ticker, "tf": tf, "trade_plan": plan}
 
 
 @router.get("/technical")

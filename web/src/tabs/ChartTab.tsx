@@ -11,6 +11,7 @@ import { useCandles } from '../lib/useCandles'
 import { useNow } from '../components/TopBar'
 import { useDrawings } from '../components/chart/useDrawings'
 import { TOOLS } from '../lib/drawings'
+import { DEFAULT_CATEGORIES, OVERLAY_CATEGORIES, overlayShapes, regimeText, type OverlayCategory } from '../lib/overlay'
 
 const TYPES: { id: ChartType; label: string }[] = [
   { id: 'candles', label: 'Candles' },
@@ -62,6 +63,20 @@ export function ChartTab() {
   const dr = useDrawings(symbol)
   const [drawMenu, setDrawMenu] = useState(false)
   const toolInfo = TOOLS.find((t) => t.type === dr.tool)
+  const [aiOn, setAiOn] = useState(false)
+  const [aiMenu, setAiMenu] = useState(false)
+  const [cats, setCats] = useState<OverlayCategory[]>(DEFAULT_CATEGORIES)
+  const lastBar = candles.at(-1)?.time
+  const { data: ov, isFetching: ovLoading, error: ovError } = useQuery({
+    queryKey: ['overlay', symbol, activeTf, Math.floor((lastBar ?? 0) / tfSec)],   // refresh once per new candle
+    queryFn: async () => {
+      const r = await fetch(`/api/overlay?symbol=${encodeURIComponent(symbol)}&tf=${activeTf}`)
+      if (!r.ok) throw new Error((await r.json()).detail ?? r.statusText)
+      return r.json()
+    },
+    enabled: aiOn && candles.length > 0, staleTime: 60_000,
+  })
+  const shapes = useMemo(() => (aiOn ? overlayShapes(ov, cats) : []), [aiOn, ov, cats])
   const drawState = useMemo(() => ({ drawings: dr.drawings, preview: dr.preview, selected: dr.selected }),
                             [dr.drawings, dr.preview, dr.selected])
 
@@ -116,6 +131,27 @@ export function ChartTab() {
             </div>
           )}
         </div>
+        <div className="relative flex">
+          <button onClick={() => setAiOn((v) => !v)} aria-pressed={aiOn}
+            title="Draw the system's own trendlines, zones, levels and the current trade plan"
+            className={`rounded-l-md border px-2.5 py-1 text-xs font-medium ${aiOn ? 'border-accent bg-accent text-white' : 'border-line text-muted hover:text-fg'}`}>
+            ✨ AI analysis{aiOn && ovLoading ? '…' : ''}
+          </button>
+          <button onClick={() => setAiMenu((m) => !m)} aria-label="Choose what the AI analysis shows" aria-expanded={aiMenu}
+            className="rounded-r-md border border-l-0 border-line px-1.5 py-1 text-xs text-muted hover:text-fg">▾</button>
+          {aiMenu && (
+            <div className="absolute left-0 top-8 z-30 w-72 rounded-md border border-line bg-panel p-1 shadow-xl">
+              {OVERLAY_CATEGORIES.map((c) => (
+                <label key={c.id} className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 text-sm hover:bg-panel-2" title={c.help}>
+                  <input type="checkbox" className="mt-1" checked={cats.includes(c.id)}
+                    onChange={() => setCats((cs) => (cs.includes(c.id) ? cs.filter((x) => x !== c.id) : [...cs, c.id]))} />
+                  <span>{c.label}<span className="block text-xs text-muted">{c.help}</span></span>
+                </label>
+              ))}
+              <button onClick={() => setAiMenu(false)} className="mt-1 w-full rounded bg-panel-2 py-1.5 text-sm font-medium">Done</button>
+            </div>
+          )}
+        </div>
         <button onClick={screenshot} title="Download a PNG of the chart"
           className="rounded-md border border-line px-2.5 py-1 text-xs font-medium text-muted hover:text-fg">📷 Screenshot</button>
         <span className="ml-auto text-xs text-muted">
@@ -126,6 +162,12 @@ export function ChartTab() {
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-2 md:flex-row">
         <div className={`relative min-h-[420px] flex-1 overflow-hidden rounded-lg border bg-panel ${dr.tool ? 'border-accent cursor-crosshair' : 'border-line'}`}>
+          {aiOn && ov && !toolInfo && (
+            <div className="pointer-events-none absolute left-1/2 top-2 z-20 -translate-x-1/2 rounded-md bg-panel-2/90 px-3 py-1 text-xs font-medium shadow" data-testid="regime">
+              {regimeText(ov, decimals)}
+            </div>
+          )}
+          {aiOn && ovError && <div className="absolute left-2 top-8 z-20 text-xs text-down">AI analysis unavailable: {(ovError as Error).message}</div>}
           {toolInfo && (
             <div className="absolute left-1/2 top-2 z-20 -translate-x-1/2 rounded-md bg-accent px-3 py-1 text-xs font-medium text-white shadow" role="status">
               {toolInfo.label}: {toolInfo.help} ({dr.pending.length}/{toolInfo.points}) · Esc to cancel
@@ -136,7 +178,7 @@ export function ChartTab() {
           ) : (
             <PriceChart ref={chart} candles={candles} chartType={chartType} indicators={indicators} decimals={decimals}
               intraday={tfSec < 86400} hasVolume={info?.has_volume ?? !symbol.includes('/')} theme={theme} barSeconds={tfSec}
-              onNeedMore={loadMore} draw={drawState} onHover={dr.setHover}
+              onNeedMore={loadMore} draw={drawState} onHover={dr.setHover} overlay={shapes}
               onChartClick={(p) => {
                 if (dr.addPoint(p)) return
                 dr.setSelected(chart.current?.hitDrawing(p.x, p.y) ?? null)

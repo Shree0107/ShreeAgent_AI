@@ -8,6 +8,8 @@ import { fmtPrice } from '../../lib/format'
 import * as I from '../../lib/indicators'
 import { hitTest, logicalToTime, type DPoint } from '../../lib/drawings'
 import { DrawingsPrimitive, type DrawState } from './DrawingsPrimitive'
+import { OverlayPrimitive } from './OverlayPrimitive'
+import type { OShape } from '../../lib/overlay'
 import type { ChartType, IndicatorId } from '../../lib/store'
 
 export interface PriceChartHandle {
@@ -37,6 +39,7 @@ interface Props {
   draw?: Pick<DrawState, 'drawings' | 'preview' | 'selected'>
   onChartClick?: (p: ChartPoint) => void
   onHover?: (p: ChartPoint | null) => void
+  overlay?: OShape[]
 }
 
 function css(name: string): string {
@@ -58,7 +61,7 @@ const PCT = { type: 'price' as const, precision: 1, minMove: 0.1 }
 const PANE_ORDER: IndicatorId[] = ['volume', 'rsi', 'macd', 'stoch', 'atr']
 
 export const PriceChart = forwardRef<PriceChartHandle, Props>(function PriceChart(
-  { candles, chartType, indicators, decimals, intraday, hasVolume, theme, barSeconds, onNeedMore, draw, onChartClick, onHover }, ref,
+  { candles, chartType, indicators, decimals, intraday, hasVolume, theme, barSeconds, onNeedMore, draw, onChartClick, onHover, overlay }, ref,
 ) {
   const box = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -67,6 +70,7 @@ export const PriceChart = forwardRef<PriceChartHandle, Props>(function PriceChar
   const needMoreRef = useRef(onNeedMore)
   needMoreRef.current = onNeedMore
   const prim = useRef(new DrawingsPrimitive())
+  const over = useRef(new OverlayPrimitive())
   const cb = useRef({ onChartClick, onHover, candles, barSeconds })
   cb.current = { onChartClick, onHover, candles, barSeconds }
   const [legend, setLegend] = useState<Candle | null>(null)
@@ -148,6 +152,7 @@ export const PriceChart = forwardRef<PriceChartHandle, Props>(function PriceChar
     chart.panes().forEach((pn, i) => pn.setStretchFactor(i === 0 ? 3 : 1))
     mainRef.current = s.main
     seriesRef.current = s
+    s.main.attachPrimitive(over.current)   // analysis overlay first, so the user's drawings sit on top
     s.main.attachPrimitive(prim.current)
     prim.current.setState({ colors: { line: css('--accent'), selected: css('--wait'), text: css('--muted'),
                                       fill: 'rgba(59,130,246,0.12)' } })
@@ -200,6 +205,7 @@ export const PriceChart = forwardRef<PriceChartHandle, Props>(function PriceChar
       el.removeEventListener('pointerdown', onDown)
       el.removeEventListener('pointerup', onUp)
       s.main.detachPrimitive(prim.current)
+      s.main.detachPrimitive(over.current)
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange)
       chart.remove()
       chartRef.current = null
@@ -252,6 +258,10 @@ export const PriceChart = forwardRef<PriceChartHandle, Props>(function PriceChar
     prim.current.setState({ times: candles.map((b) => b.time), barSeconds,
                             drawings: draw?.drawings ?? [], preview: draw?.preview ?? null, selected: draw?.selected ?? null })
   }, [candles, barSeconds, draw?.drawings, draw?.preview, draw?.selected, config])
+
+  useEffect(() => {
+    over.current.set(overlay ?? [], candles.map((b) => b.time), barSeconds, css('--muted'))
+  }, [overlay, candles, barSeconds, config])
 
   const shown = legend ?? candles[candles.length - 1] ?? null
   const chg = shown ? ((shown.close - shown.open) / shown.open) * 100 : 0

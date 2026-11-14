@@ -94,3 +94,17 @@ test('draw lines on the chart; they are saved and come back after a reload', asy
     await request.put(API, { data: before })
   }
 })
+
+test('AI analysis overlay draws on the chart', async ({ page }, info) => {
+  await page.addInitScript(() => localStorage.setItem('sa-ui', JSON.stringify({ symbol: 'EUR/USD', tf: '1h' })))
+  await page.goto('/')
+  await expect(page.getByText(/^O\s/).first()).toBeVisible()
+  await page.getByRole('button', { name: /^✨ AI analysis/ }).click()
+  await expect(page.getByTestId('regime')).toHaveText(/Trending|Sideways/, { timeout: 30_000 })
+  await page.getByRole('button', { name: 'Choose what the AI analysis shows' }).click()
+  await page.getByLabel(/Fibonacci/).check()
+  await page.getByLabel(/Liquidity/).check()
+  await page.getByRole('button', { name: 'Done' }).click()
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: `test-results/overlay-${info.project.name}.png` })
+})

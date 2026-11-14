@@ -178,3 +178,10 @@ def test_drawings_saved_per_symbol(client, tmp_path):
     assert client.get("/api/drawings", params={"symbol": "GBP/USD"}).json() == []
     bad = [{"id": "x", "type": "spiral", "points": [{"time": 1, "price": 1}]}]
     assert client.put("/api/drawings", params={"symbol": "EUR/USD"}, json=bad).status_code == 422
+
+
+def test_overlay_endpoint(client):
+    j = client.get("/api/overlay", params={"symbol": "EUR/USD", "tf": "1h"}).json()
+    assert {"swings", "trendlines", "zones", "liquidity", "regime", "trade_plan"} <= set(j)
+    assert j["regime"]["state"] in ("trending_up", "trending_down", "sideways")
+    assert client.get("/api/overlay", params={"symbol": "EUR/USD", "tf": "2h"}).status_code == 400
